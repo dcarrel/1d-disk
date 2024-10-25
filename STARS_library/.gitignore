@@ -1,0 +1,8 @@
+.DS_Store
+input/.DS_Store
+testarea/
+.idea/
+output/
+retrieval_scratch/
+retrieval/
+src/__pycache__/
