@@ -66,12 +66,16 @@ class Simulation:
         elif self.params.GEOMETRY.__eq__("LINEAR"):
             dr = self.grid.dr / 2
 
-        ts_arr = (self.params.SDT*np.abs(self.var0.ts/(self.var0.ts_dot+1e-50)))[1:-1]
+        ## probably not that good of an approximation
+        ## just don't want ts or sigma to be negative
+        ts_arr = -(self.params.SDT*self.var0.ts/(self.var0.ts_dot+1e-50))[1:-1]
+        ts_arr = np.where(ts_arr < 0, np.inf, ts_arr)
         ts_loc = np.argmin(ts_arr)
         ts_dt = ts_arr[ts_loc]
         if not self.params.EVOLVE_ENTROPY: ts_dt=np.inf
 
-        sigma_arr = (self.params.SDT*np.abs(self.var0.sigma/(self.var0.sigma_dot+1e-50)))[1:-1]
+        sigma_arr = -(self.params.SDT*self.var0.sigma/(self.var0.sigma_dot+1e-50))[1:-1]
+        sigma_arr = np.where(sigma_arr < 0, np.inf, sigma_arr)
         sigma_loc = np.argmin(sigma_arr)
         sigma_dt = sigma_arr[sigma_loc]
         if not self.params.EVOLVE_SIGMA: sigma_dt = np.inf
@@ -80,6 +84,8 @@ class Simulation:
         cfl_loc = np.argmin(cfl_arr)
         cfl_dt = cfl_arr[cfl_loc]
 
+
+        ## this is kind of a bad approximation
         sim_dt = np.minimum(np.minimum(ts_dt, sigma_dt), cfl_dt)
         self.dt = np.minimum(self.dt, sim_dt)
 
