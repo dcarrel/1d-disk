@@ -49,10 +49,9 @@ class InitialCondition:
             r1 = self.grid.r_cell[bdy1]
             bdy2 = len(self.sigma0) - np.argmax(disk_body[::-1])-1
             r2 = self.grid.r_cell[bdy2]
-            if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, sigma0_crit*(self.grid.r_cell/r1)**5, self.sigma0)
+            if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, np.maximum(sigma0_crit*(self.grid.r_cell/r1)**3, 1e-2), self.sigma0)
            # if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, sigma0_crit, self.sigma0)
             if r2 > 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell > r2, sigma0_crit*(self.grid.r_cell/r2)**-1, self.sigma0)
-            self.sigma0 = np.where(self.sigma0<1e-32, 1e-32, self.sigma0)
 
             ## sets up entropy profile in a thick state
             h0 = np.sqrt((params.BE_CRIT+1)/8)

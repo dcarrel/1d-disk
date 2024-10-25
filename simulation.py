@@ -254,13 +254,13 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True):
     var_ast = var.grid.cell_zeros()
     var_ast[1:-1] = var.data[1:-1]
     var_ast[1:-1] += (-dt*var.grid.face_area[1:]*vf[1:]*var_face[1:]+dt*var.grid.face_area[:-1]*vf[:-1]*var_face[:-1])/var.grid.cell_vol[1:-1]
-    var_ast[0] = var_ast[1]*a+1e-32
+    var_ast[0] = var_ast[1]*a+1e-2*(1-a)
     var_ast[-1] = var_ast[-2]
 
     ## transport update
     var_T = var.grid.cell_zeros()
     var_T[1:-1] = var_ast[1:-1] + dt * var.D[1:-1]
-    var_T[0] = var_T[1]*a+1e-32
+    var_T[0] = var_T[1]*a+1e-2*(1-a)
     var_T[-1] = var_T[-2]
 
     ## diffusive variables
@@ -275,7 +275,7 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True):
     var_tild[1:-1] = var_T[1:-1]
     var_tild[1:-1] += (nu_face[1:]*vol_face[1:]*(var.data[2:]-var.data[1:-1]) -
                        nu_face[:-1]*vol_face[:-1]*(var.data[1:-1] - var.data[:-2]))/var.grid.cell_vol[1:-1]
-    var_tild[0] = var_tild[1]*a+1e-32
+    var_tild[0] = var_tild[1]*a+1e-2*(1-a)
     var_tild[-1] = var_tild[-2]
     ## flux correction
     sign_face = np.sign(var_tild[1:] - var_tild[:-1])
@@ -291,7 +291,7 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True):
 
     var_ret = np.zeros(var.grid.r_cell.shape)
     var_ret[1:-1] = var_tild[1:-1] - var.grid.cell_vol[1:-1]**-1*(flux_face[1:] - flux_face[:-1])
-    var_ret[0] = var_ret[1]*a+1e-32
+    var_ret[0] = var_ret[1]*a+1e-2*(1-a)
     var_ret[-1] = var_ret[-2]
 
     return var_ret

@@ -41,7 +41,7 @@ class FullVariable:
 
     def update_variables(self, sigma, ts, t=0):
         self.sigma = sigma
-        self.sigma[0] = 1e-32
+        self.sigma[0] = 1e-1
         self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
         self.ts = ts
         self.s = np.ones(self.ts.shape)
@@ -83,6 +83,7 @@ class FullVariable:
             d_tild = np.interp(np.log10(self.grid.r_face), np.log10(self.grid.r_cell), d)
 
 
+        ## defined at the cell centers
         self.vr = np.zeros(sigma.shape)[1:]
         self.vr[1:] = -d_tild[1:] * g_tild[1:] / lc_sigma_tild[1:] * (lc_sigma[2:] / g[2:] - lc_sigma[1:-1] / g[1:-1])/self.grid.ddr[1:]
         self.vr[0] = self.vr[1]
