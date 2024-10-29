@@ -214,16 +214,15 @@ class Simulation:
 
             if self.verbose:
 
-                message = f"\rpct: {(self.t / self.params.TF * 100):2.2f}%\tdt={dt / (self.params.TF - self.t0):2.2e}\t{st}\tloc={loc:2.2f}"\
-                          +f"\tsig {sig_err:2.2e}\tts {ts_err:2.2e}\t\t\t\t\t"
                 if self.progress_message is not None:
-                    self.progress_message[0] = self.t / self.params.TF * 100  ## percentage done
-                    self.progress_message[1] = dt / (self.params.TF - self.t0) ## timestep
-                    self.progress_message[2] = st
-                    self.progress_message[3] = loc
-                    self.progress_message[4] = sig_err
-                    self.progress_message[5] = ts_err
+                    self.progress_message[1] = self.t / self.params.TF * 100  ## percentage done
+                    self.progress_message[2] = dt / (self.params.TF - self.t0) ## timestep
+                    self.progress_message[3] = st
+                    self.progress_message[4] = loc
+                    self.progress_message[5] = sig_err
+                    self.progress_message[6] = ts_err
                 else:
+                    message = f"\rpct: {(self.t / self.params.TF * 100):2.2f}%\tdt={dt / (self.params.TF - self.t0):2.2e}\t{st}\tloc={loc:2.2f}"+f"\tsig {sig_err:2.2e}\tts {ts_err:2.2e}\t\t\t\t\t"
                     print(message, end="")
             if np.isnan(dt) or np.any(self.var0.ts<0): break
             if self.t > self.params.TF: break

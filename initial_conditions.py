@@ -79,6 +79,7 @@ class InitialCondition:
             ic_pdict["SAVE"] = False
             ic_pdict["TF"] = tf
             ic_pdict["SIM_DIR"] = save_dir
+            ic_pdict["TOL"] = 1e-2
             self.params = Params(load=ic_pdict)
 
             self.sim = Simulation(self.sigma0, self.entropy0, params=self.params, verbose=verbose,
