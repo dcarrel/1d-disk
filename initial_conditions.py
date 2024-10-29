@@ -41,6 +41,7 @@ class InitialCondition:
             self.grid = Grid(params=params)
             self.sigma0 = analytic_solution(m0*params.MSTAR, 2*params.RP, tv)(self.grid.r_cell)
             self.params=params
+            self.eos = load_table(self.params.EOS_TABLE)
 
             ## sets the power law profile in the ambient region
             sigma0_max = np.max(self.sigma0)
@@ -53,24 +54,23 @@ class InitialCondition:
 
             def to_min(r):
                 a = 3
-                f = (self.grid.r_cell[0]/r1)**a
+                f = (r[0]/r1)**a
                 sigf = self.params.SIGMA_FLOOR-sigma0_crit*f/(1-f)
-                return (sigma0_crit - sigf)*(self.grid.r_cell/r1)**a+sigf
+                return (sigma0_crit - sigf)*(r/r1)**a+sigf
+
 
             if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, to_min(self.grid.r_cell), self.sigma0)
            # if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, sigma0_crit, self.sigma0)
-            if r2 > 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell > r2, sigma0_crit*(self.grid.r_cell/r2)**-1, self.sigma0)
+            if r2 > 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell > r2, sigma0_crit*(self.grid.r_cell/r2)**-3, self.sigma0)
 
             ## sets up entropy profile in a thick state
             h0 = np.sqrt((params.BE_CRIT+1)/8)
-            #h0 = np.where(np.logical_or(self.grid.r_cell<r1, self.grid.r_cell>r2), 1e-3*h0, h0)
+            h0 *= self.sigma0/sigma0_max+1e-3
             density0 = self.sigma0/2/h0/self.grid.r_cell
             chi0 = self.sigma0*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
-            temperature= np.power(3*self.sigma0**2/4/RADA/density0, 0.25)
-            temperature = get_temperature_from_density(temperature, chi0, density0)
+
+            temperature = get_temperature_from_density(1000*self.grid.cell_ones(), chi0, density0)
             self.entropy0 = entropy_difference(temperature, chi0, None, just_estimate=True)
-
-
 
 
             ic_pdict = self.params._pdict.copy()
@@ -131,8 +131,8 @@ class InitialCondition:
         axs[2].set_ylim(bottom=0.1)
 
         axs[3].loglog(self.grid.r_cell, self.sim.var0.h)
-        axs[3].set_ylim(1e-6, 1)
-        axs[3].set_title("$h$", fontsize=15)
+        #axs[3].set_ylim(1e-6, 1)
+        axs[3].set_title(r"$h$", fontsize=15)
 
         for ax in axs:
             ax.set_xlabel("Radius (cm)", fontsize=15)
