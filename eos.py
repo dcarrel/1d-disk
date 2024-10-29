@@ -7,9 +7,10 @@ from consts import *
 XH   = 0.7
 XHe  = 0.3
 mu   = XH*MP + 4*XHe*MP
-Xi = np.array([XH, XH, XHe])
+## hydrogen, electron fraction, helium fraction
+Xi = np.array([XH, XH+4*XHe, XHe])
 mi = np.array([MP, ME, 4*MP])
-Xi_over_mi = Xi/np.array([MP, MP, 4*MP])
+Xi_over_mi = Xi/mi
 
 ## returns temperature, density
 def rad_temp(chi, entropy):

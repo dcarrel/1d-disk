@@ -144,7 +144,7 @@ class Simulation:
             inv_condition = is_invalid(ts_full) or is_invalid(sigma_full)
 
             if err_condition or inv_condition:
-                self.dt *= 0.85
+                self.dt *= 0.9
                 n += 1
             elif n > self.params.MAXIT:
                 if self.progress_message is None and self.verbose:
@@ -152,8 +152,8 @@ class Simulation:
                     print(f"sigma_max {max_sigma_err:2.2e}; entropy_max {max_ts_err:2.2e}; dt {(self.dt/(self.params.TF-self.t0)):2.2e}")
                 break
             ## changes timestep
-            elif (max_ts_err < 0.3*self.params.TOL) and (max_sigma_err < 0.3*self.params.TOL):
-                self.dt /= 0.85
+            elif (max_ts_err < 0.9*self.params.TOL) and (max_sigma_err < 0.9*self.params.TOL):
+                self.dt /= 0.9
                 break
             else:
                 if self.dt < sim_dt:
