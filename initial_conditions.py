@@ -20,7 +20,8 @@ def analytic_solution(M0, R0, TVISC):
     return func
 
 class InitialCondition:
-    def __init__(self, m0=0.01, tv=1, ambf=1e-5, params=Params(), tf=1*MONTH, load_from=None, save_dir=None, verbose=True, evolve=True):
+    def __init__(self, m0=0.01, tv=1, ambf=1e-5, params=Params(), tf=1*MONTH, load_from=None,
+                 save_dir=None, verbose=True, evolve=True, progress_message=None):
         self.load_from = load_from
         if save_dir is None and load_from is not None:
             save_dir = load_from
@@ -80,7 +81,8 @@ class InitialCondition:
             ic_pdict["SIM_DIR"] = save_dir
             self.params = Params(load=ic_pdict)
 
-            self.sim = Simulation(self.sigma0, self.entropy0, params=self.params, verbose=verbose)
+            self.sim = Simulation(self.sigma0, self.entropy0, params=self.params, verbose=verbose,
+                                  progress_message=progress_message)
             self._makefig("before_evolving.png")
             if evolve:
                 self.sim.evolve()
