@@ -177,7 +177,7 @@ class Params:
 
         self.CAPTURE=True if self.RT < self.RSCH else False
         self.R0 = 2*self.RSCH
-        self.RF = 2000*self.RSCH
+        self.RF = 5000*self.RSCH
 
 
 
