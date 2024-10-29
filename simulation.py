@@ -92,7 +92,8 @@ class Simulation:
         arr = np.array([ts_dt, sigma_dt, cfl_dt])
         st = np.argmin(arr)
         loc = [ts_loc, sigma_loc, cfl_loc][st]+1
-        st = ["tss", "sis", "cfl"][st]
+        if self.progress_message is None:
+            st = ["tss", "sis", "cfl"][st]
 
         n, ts_full, sigma_full, max_sigma_err, max_ts_err = 0, [], [], np.inf, np.inf
         vr = np.copy(self.var0.vr)
@@ -156,7 +157,10 @@ class Simulation:
                 break
             else:
                 if self.dt < sim_dt:
-                    st = ["tsc", "sic"][which_to_use]
+                    if self.progress_message is None:
+                        st = ["tsc", "sic"][which_to_use]
+                    else:
+                        st = [3, 4][which_to_use]
                     loc = [max_ts_loc, max_sigma_loc][which_to_use]
                 break
 
@@ -213,8 +217,8 @@ class Simulation:
                 message = f"\rpct: {(self.t / self.params.TF * 100):2.2f}%\tdt={dt / (self.params.TF - self.t0):2.2e}\t{st}\tloc={loc:2.2f}"\
                           +f"\tsig {sig_err:2.2e}\tts {ts_err:2.2e}\t\t\t\t\t"
                 if self.progress_message is not None:
-                    self.progress_message[0] = self.t / self.params.TF * 100
-                    self.progress_message[1] = dt / (self.params.TF - self.t0)
+                    self.progress_message[0] = self.t / self.params.TF * 100  ## percentage done
+                    self.progress_message[1] = dt / (self.params.TF - self.t0) ## timestep
                     self.progress_message[2] = st
                     self.progress_message[3] = loc
                     self.progress_message[4] = sig_err
