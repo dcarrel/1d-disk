@@ -45,7 +45,8 @@ class Params:
                  PRINT=False,
 
                  M0=0.01,
-                 TV0=0.05
+                 TV0=0.05,
+                 SIGMA_FLOOR=1e-3
                  ):
         self._pdict = {"MBH": float(MBH),
                            "R0": float(R0),
@@ -81,7 +82,8 @@ class Params:
                            "SAVE": SAVE,
                            "MAXTIME": MAXTIME,
                            "M0": M0,
-                           "TV0":TV0
+                           "TV0":TV0,
+                            "SIGMA_FLOOR": SIGMA_FLOOR
             }
 
         if load is not None:
@@ -148,6 +150,7 @@ class Params:
 
         self.M0 = self._pdict["M0"]
         self.TV0 = self._pdict["TV0"]
+        self.SIGMA_FLOOR = self._pdict["SIGMA_FLOOR"]
 
         ## c+p from https://dergipark.org.tr/en/download/article-file/1612778
         def stellar_radius(m):
@@ -174,7 +177,7 @@ class Params:
 
         self.CAPTURE=True if self.RT < self.RSCH else False
         self.R0 = 2*self.RSCH
-        self.RF = 5000*self.RSCH
+        self.RF = 2000*self.RSCH
 
 
 

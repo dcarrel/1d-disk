@@ -49,17 +49,28 @@ class InitialCondition:
             r1 = self.grid.r_cell[bdy1]
             bdy2 = len(self.sigma0) - np.argmax(disk_body[::-1])-1
             r2 = self.grid.r_cell[bdy2]
-            if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, np.maximum(sigma0_crit*(self.grid.r_cell/r1)**3, 1e-2), self.sigma0)
+
+            def to_min(r):
+                a = 3
+                f = (self.grid.r_cell[0]/r1)**a
+                sigf = self.params.SIGMA_FLOOR-sigma0_crit*f/(1-f)
+                return (sigma0_crit - sigf)*(self.grid.r_cell/r1)**a+sigf
+
+            if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, to_min(self.grid.r_cell), self.sigma0)
            # if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, sigma0_crit, self.sigma0)
             if r2 > 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell > r2, sigma0_crit*(self.grid.r_cell/r2)**-1, self.sigma0)
 
             ## sets up entropy profile in a thick state
             h0 = np.sqrt((params.BE_CRIT+1)/8)
+            #h0 = np.where(np.logical_or(self.grid.r_cell<r1, self.grid.r_cell>r2), 1e-3*h0, h0)
             density0 = self.sigma0/2/h0/self.grid.r_cell
-            chi0 = self.sigma0*self.grid.omgko
+            chi0 = self.sigma0*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
             temperature= np.power(3*self.sigma0**2/4/RADA/density0, 0.25)
             temperature = get_temperature_from_density(temperature, chi0, density0)
             self.entropy0 = entropy_difference(temperature, chi0, None, just_estimate=True)
+
+
+
 
             ic_pdict = self.params._pdict.copy()
             ic_pdict["EVOLVE_SIGMA"] = False

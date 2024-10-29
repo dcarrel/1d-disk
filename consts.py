@@ -14,6 +14,7 @@ PC = 3e18
 MONTH = 30*DAY
 YEAR = 365*DAY
 HOUR = DAY/24
+ENTROPY_MIN = KB/MP
 
 
 def arr_to_string(array, t=None):

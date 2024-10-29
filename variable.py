@@ -41,19 +41,23 @@ class FullVariable:
 
     def update_variables(self, sigma, ts, t=0):
         self.sigma = sigma
-        self.sigma[0] = 1e-1
+        self.sigma[0] = self.params.SIGMA_FLOOR
+        self.sigma = np.where(self.sigma<self.params.SIGMA_FLOOR, self.params.SIGMA_FLOOR, self.sigma)
+
         self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
         self.ts = ts
         self.s = np.ones(self.ts.shape)
         self.s[1:] = self.ts[1:]/self.sigma[1:]
         self.s[0] = self.s[1]
+
+        #self.s = np.where(self.s<ENTROPY_MIN, ENTROPY_MIN, self.s)
+        self.ts = self.s*self.sigma
         self.t = t
 
-        self.T = np.zeros(self.s.shape)+1e-32
-        self.T[1:] = self.eos(self.chi[1:], self.s[1:])
+        self.T = self.eos(self.chi, self.s)
         
         self.rho = np.zeros(self.s.shape)+1e-32
-        self.rho[1:] = entropy_difference(self.T[1:], self.chi[1:], self.s[1:], just_density=True)
+        self.rho = entropy_difference(self.T, self.chi, self.s, just_density=True)
         self.U = RADA*self.T**4 + 1.5*self.rho*KB*self.T/mu
         self.P = RADA*self.T**4/3 + self.rho*KB*self.T/mu
 

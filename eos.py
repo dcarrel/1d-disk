@@ -35,8 +35,7 @@ def gas_dens(chi, entropy, temp,):
     return dens
 
 ## Estimates the entropy for a given temperature
-## oh my god all this fucking shit needs to be cleaned up
-def entropy_difference(temp, chi, entropy, just_density=False, temp_log=False, just_estimate=False):
+def entropy_difference(temp, chi, entropy=None, just_density=False, temp_log=False, just_estimate=False):
     if temp_log:
         temp = np.power(10, temp)
     Bi = (2 * np.pi * mi * KB / HP ** 2) ** 1.5 * mi / Xi

@@ -91,10 +91,9 @@ class Simulation:
 
         arr = np.array([ts_dt, sigma_dt, cfl_dt])
         st = np.argmin(arr)
-        loc = [ts_loc, sigma_loc, cfl_loc][np.argmin(arr)]
-        loc = self.grid.r_cell[loc]/self.grid.r_cell[0]
+        loc = [ts_loc, sigma_loc, cfl_loc][st]+1
+        st = ["tss", "sis", "cfl"][st]
 
-        ## I have no fucking clue what any of this dumb shit is
         n, ts_full, sigma_full, max_sigma_err, max_ts_err = 0, [], [], np.inf, np.inf
         vr = np.copy(self.var0.vr)
 
@@ -103,12 +102,16 @@ class Simulation:
             ts = self.var0.ts_var()
 
             ts_full_o1, sigma_full_o1 = ts.data, sigma.data
-            if self.params.EVOLVE_ENTROPY: ts_full_o1 = shasta_step(ts, vr, self.dt, interp=self.params.INTERP, dirichlet_left=False)
-            if self.params.EVOLVE_SIGMA: sigma_full_o1 = shasta_step(sigma, vr, self.dt, interp=self.params.INTERP, dirichlet_left=True)
+            if self.params.EVOLVE_ENTROPY: ts_full_o1 = shasta_step(ts, vr, self.dt, interp=self.params.INTERP,
+                                                                    dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
+            if self.params.EVOLVE_SIGMA: sigma_full_o1 = shasta_step(sigma, vr, self.dt, interp=self.params.INTERP,
+                                                                     dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
 
             ts_half, sigma_half = ts.data, sigma.data
-            if self.params.EVOLVE_ENTROPY: ts_half = shasta_step(ts, vr, self.dt/2, interp=self.params.INTERP, dirichlet_left=False)
-            if self.params.EVOLVE_SIGMA: sigma_half = shasta_step(sigma, vr, self.dt/2, interp=self.params.INTERP, dirichlet_left=True)
+            if self.params.EVOLVE_ENTROPY: ts_half = shasta_step(ts, vr, self.dt/2, interp=self.params.INTERP,
+                                                                 dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
+            if self.params.EVOLVE_SIGMA: sigma_half = shasta_step(sigma, vr, self.dt/2, interp=self.params.INTERP,
+                                                                  dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
             self.vhalf.update_variables(sigma_half, ts_half, t=self.t+self.dt/2)
 
             vf_half = np.copy(self.vhalf.vr)
@@ -116,17 +119,29 @@ class Simulation:
             ts.D = self.vhalf.ts_dot
 
             ts_full, sigma_full = ts.data, sigma.data
-            if self.params.EVOLVE_ENTROPY: ts_full = shasta_step(ts, vf_half, self.dt, interp=self.params.INTERP, dirichlet_left=False)
-            if self.params.EVOLVE_SIGMA: sigma_full = shasta_step(sigma, vf_half, self.dt, interp=self.params.INTERP, dirichlet_left=True)
+            if self.params.EVOLVE_ENTROPY: ts_full = shasta_step(ts, vf_half, self.dt, interp=self.params.INTERP,
+                                                                 dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
+            if self.params.EVOLVE_SIGMA: sigma_full = shasta_step(sigma, vf_half, self.dt, interp=self.params.INTERP,
+                                                                  dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
 
             ts_err = np.abs(ts_full_o1[1:-1] - ts_full[1:-1])/ts_full[1:-1]
             sigma_err = np.abs(sigma_full_o1[1:-1] - sigma_full[1:-1])/sigma_full[1:-1]
 
             max_ts_err = np.max(ts_err)
-            max_sigma_err = np.max(sigma_err)
+            max_ts_loc = np.argmax(ts_err)+1
 
-            err_condition = max_ts_err > self.params.TOL or max_sigma_err > self.params.TOL
+            max_sigma_err = np.max(sigma_err)
+            max_sigma_loc = np.argmax(ts_err)+1
+
+            ## which error is larger
+            which_to_use = 0 if max_ts_err > max_sigma_err else 1
+
+            ts_cond = max_ts_err > self.params.TOL
+            sig_cond = max_sigma_err > self.params.TOL
+
+            err_condition = ts_cond or sig_cond
             inv_condition = is_invalid(ts_full) or is_invalid(sigma_full)
+
             if err_condition or inv_condition:
                 self.dt *= 0.85
                 n += 1
@@ -136,14 +151,18 @@ class Simulation:
                     print(f"sigma_max {max_sigma_err:2.2e}; entropy_max {max_ts_err:2.2e}; dt {(self.dt/(self.params.TF-self.t0)):2.2e}")
                 break
             ## changes timestep
-            elif (max_ts_err < 0.2*self.params.TOL) and (max_sigma_err < 0.2*self.params.TOL):
+            elif (max_ts_err < 0.3*self.params.TOL) and (max_sigma_err < 0.3*self.params.TOL):
                 self.dt /= 0.85
                 break
             else:
+                if self.dt < sim_dt:
+                    st = ["tsc", "sic"][which_to_use]
+                    loc = [max_ts_loc, max_sigma_loc][which_to_use]
                 break
 
         self.t += self.dt
         self.var0.update_variables(sigma_full, ts_full, t=self.t)
+        ## returns timestep, reason for minimum timestep, location, sigma_error, ts_error
         return self.dt, st, loc, max_sigma_err, max_ts_err
     def evolve(self):
         sigmafile, sfile = None, None
@@ -190,6 +209,7 @@ class Simulation:
             ## loop breaking conditions
 
             if self.verbose:
+
                 message = f"\rpct: {(self.t / self.params.TF * 100):2.2f}%\tdt={dt / (self.params.TF - self.t0):2.2e}\t{st}\tloc={loc:2.2f}"\
                           +f"\tsig {sig_err:2.2e}\tts {ts_err:2.2e}\t\t\t\t\t"
                 if self.progress_message is not None:
@@ -236,7 +256,7 @@ class Simulation:
             np.save(os.path.abspath(self.sim_dir+"/entropy.npy"), entropy_array)
             np.save(os.path.abspath(self.sim_dir+"/tsave.npy"), t_array)
 
-def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True):
+def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True, sigma_floor=1e-3):
     ## add different interpolation options at some point, probably will not really matter
     ## no reason to at the moment
     var_face, vol_face = [], []
@@ -247,20 +267,19 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True):
         var_face = np.interp(np.log10(var.grid.r_face), np.log10(var.grid.r_cell), var.data)
         vol_face = np.interp(np.log10(var.grid.r_face), np.log10(var.grid.r_cell), var.grid.cell_vol)
 
-    dirichlet_left=True
     a = 0 if dirichlet_left else 1
 
     ## convective update
     var_ast = var.grid.cell_zeros()
     var_ast[1:-1] = var.data[1:-1]
     var_ast[1:-1] += (-dt*var.grid.face_area[1:]*vf[1:]*var_face[1:]+dt*var.grid.face_area[:-1]*vf[:-1]*var_face[:-1])/var.grid.cell_vol[1:-1]
-    var_ast[0] = var_ast[1]*a+1e-2*(1-a)
+    var_ast[0] = var_ast[1]*a+sigma_floor*(1-a)
     var_ast[-1] = var_ast[-2]
 
     ## transport update
     var_T = var.grid.cell_zeros()
     var_T[1:-1] = var_ast[1:-1] + dt * var.D[1:-1]
-    var_T[0] = var_T[1]*a+1e-2*(1-a)
+    var_T[0] = var_T[1]*a+sigma_floor*(1-a)
     var_T[-1] = var_T[-2]
 
     ## diffusive variables
@@ -275,7 +294,7 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True):
     var_tild[1:-1] = var_T[1:-1]
     var_tild[1:-1] += (nu_face[1:]*vol_face[1:]*(var.data[2:]-var.data[1:-1]) -
                        nu_face[:-1]*vol_face[:-1]*(var.data[1:-1] - var.data[:-2]))/var.grid.cell_vol[1:-1]
-    var_tild[0] = var_tild[1]*a+1e-2*(1-a)
+    var_tild[0] = var_tild[1]*a+sigma_floor*(1-a)
     var_tild[-1] = var_tild[-2]
     ## flux correction
     sign_face = np.sign(var_tild[1:] - var_tild[:-1])
@@ -291,7 +310,7 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True):
 
     var_ret = np.zeros(var.grid.r_cell.shape)
     var_ret[1:-1] = var_tild[1:-1] - var.grid.cell_vol[1:-1]**-1*(flux_face[1:] - flux_face[:-1])
-    var_ret[0] = var_ret[1]*a+1e-2*(1-a)
+    var_ret[0] = var_ret[1]*a+sigma_floor*(1-a)
     var_ret[-1] = var_ret[-2]
 
     return var_ret
