@@ -100,6 +100,8 @@ class Simulation:
 
         self.dt /= 0.9
 
+        bk=False
+
         while True: ## adaptive timestepping based on RK12
             sigma = self.var0.sigma_var()
             ts = self.var0.ts_var()
@@ -152,6 +154,7 @@ class Simulation:
             if err_condition or inv_condition:
                 self.dt *= 0.9
                 n += 1
+                bk=True
             elif n > self.params.MAXIT:
                 if self.progress_message is None and self.verbose:
                     print(f"Could not converge to desired tolerances in {self.params.MAXIT} iterations")
@@ -159,7 +162,7 @@ class Simulation:
                 break
             ## changes timestep
             else:
-                if self.dt < sim_dt/0.9:
+                if bk:
                     if self.progress_message is None:
                         st = ["tsc", "sic"][which_to_use]
                     else:
