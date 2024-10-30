@@ -98,6 +98,8 @@ class Simulation:
         n, ts_full, sigma_full, max_sigma_err, max_ts_err = 0, [], [], np.inf, np.inf
         vr = np.copy(self.var0.vr)
 
+        self.dt /= 0.9
+
         while True: ## adaptive timestepping based on RK12
             sigma = self.var0.sigma_var()
             ts = self.var0.ts_var()
@@ -125,22 +127,26 @@ class Simulation:
             if self.params.EVOLVE_SIGMA: sigma_full = shasta_step(sigma, vf_half, self.dt, interp=self.params.INTERP,
                                                                   dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
 
-            ts_err = np.abs(ts_full_o1[1:-1] - ts_full[1:-1])/ts_full[1:-1]
-            sigma_err = np.abs(sigma_full_o1[1:-1] - sigma_full[1:-1])/sigma_full[1:-1]
+            ts_tol = ts_full[1:-1]*self.params.TOL + self.params.ENTROPY_ATOL*self.params.SIGMA_FLOOR
+            sigma_tol = sigma_full[1:-1]*self.params.TOL + self.params.SIGMA_ATOL
 
-            max_ts_err = np.max(ts_err)
-            max_ts_loc = np.argmax(ts_err)+1
+            ts_err = ts_tol - np.abs(ts_full_o1[1:-1] - ts_full[1:-1])
+            sigma_err = sigma_tol - np.abs(sigma_full_o1[1:-1] - sigma_full[1:-1])
 
-            max_sigma_err = np.max(sigma_err)
-            max_sigma_loc = np.argmax(ts_err)+1
+            ts_rel_err = np.abs(ts_full_o1[1:-1] - ts_full[1:-1])/(ts_full[1:-1])
+            sigma_rel_err = np.abs(sigma_full_o1[1:-1] - sigma_full[1:-1]) / (sigma_full[1:-1])
+
+            min_ts_loc = np.argmin(ts_err)+1
+            min_sigma_loc = np.argmin(sigma_err)+1
+
+            max_sigma_err = np.max(sigma_rel_err)
+            max_ts_err = np.max(ts_rel_err)
+
 
             ## which error is larger
-            which_to_use = 0 if max_ts_err > max_sigma_err else 1
+            which_to_use = 0 if np.any(ts_err < 0) else 1
 
-            ts_cond = max_ts_err > self.params.TOL
-            sig_cond = max_sigma_err > self.params.TOL
-
-            err_condition = ts_cond or sig_cond
+            err_condition = np.any(ts_err < 0) or np.any(sigma_err < 0)
             inv_condition = is_invalid(ts_full) or is_invalid(sigma_full)
 
             if err_condition or inv_condition:
@@ -152,16 +158,13 @@ class Simulation:
                     print(f"sigma_max {max_sigma_err:2.2e}; entropy_max {max_ts_err:2.2e}; dt {(self.dt/(self.params.TF-self.t0)):2.2e}")
                 break
             ## changes timestep
-            elif (max_ts_err < 0.9*self.params.TOL) and (max_sigma_err < 0.9*self.params.TOL):
-                self.dt /= 0.9
-                break
             else:
-                if self.dt < sim_dt:
+                if self.dt < sim_dt/0.9:
                     if self.progress_message is None:
                         st = ["tsc", "sic"][which_to_use]
                     else:
                         st = [3, 4][which_to_use]
-                    loc = [max_ts_loc, max_sigma_loc][which_to_use]
+                    loc = [min_ts_loc, min_sigma_loc][which_to_use]
                 break
 
         self.t += self.dt

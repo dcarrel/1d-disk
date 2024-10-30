@@ -25,6 +25,8 @@ class Params:
                  FSH=0.5,               ## Fallback parameter
                  ALPHA=0.01,            ## Viscosity parameter
                  TOL=1e-3,              ## Numerical tolerance, approximated by RK1/2 difference
+                 SIGMA_ATOL = None,          ## surface density absolute tolerance
+                 ENTROPY_ATOL = None,        ## entropy absolute tolerance
                  MAXIT=1000,            ## Max number of iterations for adapative timestepping
                  load=None,             ## Option to load parameter file from pre-existing one
                  EOS_TABLE="EOS", ## What EOS table to use
@@ -48,6 +50,17 @@ class Params:
                  TV0=0.05,
                  SIGMA_FLOOR=1e-3
                  ):
+
+        ## blah blah blah blah
+
+        self.SIGMA_ATOL = SIGMA_ATOL
+        self.ENTROPY_ATOL = ENTROPY_ATOL
+
+        if self.SIGMA_ATOL is None:
+            self.SIGMA_ATOL = 0.1*SIGMA_FLOOR
+        if self.ENTROPY_ATOL is None:
+            self.ENTROPY_ATOL = 10*KB/MP
+
         self._pdict = {"MBH": float(MBH),
                            "R0": float(R0),
                            "RF": float(RF),
@@ -67,6 +80,8 @@ class Params:
                            "FSH": float(FSH),
                            "ALPHA":float(ALPHA),
                            "TOL": float(TOL),
+                           "SIGMA_ATOL": float(self.SIGMA_ATOL),
+                           "ENTROPY_ATOL": float(self.ENTROPY_ATOL),
                            "MAXIT": int(MAXIT),
                            "EOS_TABLE": EOS_TABLE,
                            "GEOMETRY": GEOMETRY,
@@ -128,6 +143,14 @@ class Params:
 
         self.ALPHA = self._pdict["ALPHA"]
         self.TOL = self._pdict["TOL"]
+        self.SIGMA_ATOL = self._pdict["SIGMA_ATOL"]
+        self.ENTROPY_ATOL = self._pdict["ENTROPY_ATOL"]
+
+        if self.SIGMA_ATOL is None:
+            self.SIGMA_ATOL = 0.1*self._pdict["SIGMA_FLOOR"]
+        if self.ENTROPY_ATOL is None:
+            self.ENTROPY_ATOL = 10*KB/MP
+
         self.MAXIT = self._pdict["MAXIT"]
         self.EOS_TABLE = self._pdict["EOS_TABLE"]
         self.GEOMETRY = self._pdict["GEOMETRY"]
