@@ -108,15 +108,15 @@ class Simulation:
 
             ts_full_o1, sigma_full_o1 = ts.data, sigma.data
             if self.params.EVOLVE_ENTROPY: ts_full_o1 = shasta_step(ts, vr, self.dt, interp=self.params.INTERP,
-                                                                    dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
+                                                                    dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
             if self.params.EVOLVE_SIGMA: sigma_full_o1 = shasta_step(sigma, vr, self.dt, interp=self.params.INTERP,
-                                                                     dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
+                                                                     dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
 
             ts_half, sigma_half = ts.data, sigma.data
             if self.params.EVOLVE_ENTROPY: ts_half = shasta_step(ts, vr, self.dt/2, interp=self.params.INTERP,
-                                                                 dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
+                                                                 dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
             if self.params.EVOLVE_SIGMA: sigma_half = shasta_step(sigma, vr, self.dt/2, interp=self.params.INTERP,
-                                                                  dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
+                                                                  dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
             self.vhalf.update_variables(sigma_half, ts_half, t=self.t+self.dt/2)
 
             vf_half = np.copy(self.vhalf.vr)
@@ -125,9 +125,9 @@ class Simulation:
 
             ts_full, sigma_full = ts.data, sigma.data
             if self.params.EVOLVE_ENTROPY: ts_full = shasta_step(ts, vf_half, self.dt, interp=self.params.INTERP,
-                                                                 dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
+                                                                 dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
             if self.params.EVOLVE_SIGMA: sigma_full = shasta_step(sigma, vf_half, self.dt, interp=self.params.INTERP,
-                                                                  dirichlet_left=True, sigma_floor=self.params.SIGMA_FLOOR)
+                                                                  dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
 
             ts_tol = ts_full[1:-1]*self.params.TOL + self.params.ENTROPY_ATOL*self.params.SIGMA_FLOOR
             sigma_tol = sigma_full[1:-1]*self.params.TOL + self.params.SIGMA_ATOL
@@ -170,7 +170,7 @@ class Simulation:
                     loc = [min_ts_loc, min_sigma_loc][which_to_use]
                 break
 
-        self.t += self.dt
+        self.t += np.minimum(self.dt, self.params.TF-self.t)
         self.var0.update_variables(sigma_full, ts_full, t=self.t)
         ## returns timestep, reason for minimum timestep, location, sigma_error, ts_error
         return self.dt, st, loc, max_sigma_err, max_ts_err
@@ -231,7 +231,7 @@ class Simulation:
                     message = f"\rpct: {(self.t / self.params.TF * 100):2.2f}%\tdt={dt / (self.params.TF - self.t0):2.2e}\t{st}\tloc={loc:2.2f}"+f"\tsig {sig_err:2.2e}\tts {ts_err:2.2e}\t\t\t\t\t"
                     print(message, end="")
             if np.isnan(dt) or np.any(self.var0.ts<0): break
-            if self.t > self.params.TF: break
+            if self.t >= self.params.TF: break
 
         if self.params.SAVE:
             sigmafile.close()

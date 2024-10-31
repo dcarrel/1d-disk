@@ -41,7 +41,7 @@ class FullVariable:
 
     def update_variables(self, sigma, ts, t=0):
         self.sigma = sigma
-        self.sigma[0] = self.params.SIGMA_FLOOR
+        self.sigma[0] = self.sigma[1]#*(self.grid.r_cell[1]/self.grid.r_cell[0]) ## ratio
         self.sigma = np.where(self.sigma<self.params.SIGMA_FLOOR, self.params.SIGMA_FLOOR, self.sigma)
 
         self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
@@ -55,17 +55,14 @@ class FullVariable:
         self.t = t
 
         self.T = self.eos(self.chi, self.s)
-        self.T[0] = 0
-        
-        self.rho = np.zeros(self.s.shape)+1e-32
-        self.rho[1:] = entropy_difference(self.T[1:], self.chi[1:], self.s[1:], just_density=True)
+
+        self.rho = entropy_difference(self.T, self.chi, self.s, just_density=True)
         self.U = RADA*self.T**4 + 1.5*self.rho*KB*self.T/mu
         self.P = RADA*self.T**4/3 + self.rho*KB*self.T/mu
 
         self.be = -1 + 2*(self.U + self.P)/self.rho/self.grid.vk2o
 
         self.H = self.sigma/2/self.rho
-        self.H[0] = 0
         self.h = self.H/self.grid.r_cell
 
         if self.params.CONST_NU:
@@ -92,8 +89,9 @@ class FullVariable:
 
         ## defined at the cell centers
         self.vr = np.zeros(sigma.shape)[1:]
-        self.vr[1:] = -d_tild[1:] * g_tild[1:] / lc_sigma_tild[1:] * (lc_sigma[2:] / g[2:] - lc_sigma[1:-1] / g[1:-1])/self.grid.ddr[1:]
-        self.vr[0] = self.vr[1]
+        self.vr[:] = -d_tild[:] * g_tild[:] / lc_sigma_tild[:] * (lc_sigma[1:] / g[1:] - lc_sigma[:-1] / g[:-1])/self.grid.ddr[:]
+        self.vr[0] = np.minimum(0, self.vr[0])
+        #self.vr[0] = self.vr[1]
 
 
         ## calculate source terms for density
