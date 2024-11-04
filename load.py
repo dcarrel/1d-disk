@@ -29,7 +29,7 @@ def Snu_scattering(T, rho, nu, grid, filter=None):
 
 class LoadSimulation:
     def __init__(self, t0=None, tf=None, dt=0.1*YEAR, mode="CONST", tend=3*MONTH, dts=10*DAY, tstart=10*DAY,
-                 params=Params(), file_dir=None, read_dat=False, temp_filter=None):
+                 params=Params(), file_dir=None, read_dat=False, temp_filter=None, tindex=None):
 
         if file_dir is None:
             self.sim_dir = os.path.abspath(params.SIM_DIR)
@@ -47,6 +47,8 @@ class LoadSimulation:
             ## want to make homogeneous
             self.ts_by_file = [np.loadtxt(f, skiprows=1, usecols=0) for f in self.glob_sigma]
             max_num = np.max([len(ts) for ts in self.ts_by_file])
+
+            
             for i, ts in enumerate(self.ts_by_file):
                 lts = len(ts)
                 if not len(ts) == max_num:
@@ -64,7 +66,19 @@ class LoadSimulation:
             tf = self.ts[-1]
 
         comparr = []
-        if mode.__eq__("CONST"):
+
+        def mass_distribution(x, f):
+            am_x = spec_ang(x)
+            am_dist = am_distribution(am_x, f)
+            result = am_dist * dl_dr(x) / 2 / np.pi / x
+            result = np.where(np.logical_or(np.isnan(result), np.isinf(result)), 0, result)
+            result = np.where(result < 0, 0, result)
+            return result
+	self.mass_distribution = mass_distribution(self.grid.r_cell, self.params.SIGMAF)
+
+        if tindex is not None:
+            comparr = np.array(self.ts)[tindex]
+        elif mode.__eq__("CONST"):
             comparr = np.append(np.arange(t0, tf, dt), tf)
         elif mode.__eq__("LINEAR"):
             # Linear ramp
@@ -125,7 +139,7 @@ class LoadSimulation:
 
         self.eos = load_table(params.EOS_TABLE)
 
-        self.chi = self.sigma*self.grid.omgko
+        self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
         self.T = self.eos(self.chi, self.s)
 
         self.rho = entropy_difference(self.T, self.chi, self.s, just_density=True)
@@ -182,10 +196,8 @@ class LoadSimulation:
         sigma_wl = params.FWIND*self.sigma * self.grid.omgko * self.sigv  ## wind loss
         if not params.WIND_ON: sigma_wl *= 0
 
-        sigma_fb = 1/np.pi/gamma(params.FBK/2+1)/params.FBR0**2
-        sigma_fb *= (self.grid.r_cell/params.FBR0)**params.FBK*np.exp(-(self.grid.r_cell/params.FBR0)**2)
         time_part = params.MDOT(self.ts)
-        sigma_fb = np.einsum("i,j->ij", time_part, sigma_fb)
+        sigma_fb = np.einsum("i,j->ij", time_part, self.mass_distribution)
         if not params.FB_ON: sigma_fb *= 0
 
         self.sigma_fb = sigma_fb
