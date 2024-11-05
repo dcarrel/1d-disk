@@ -25,8 +25,8 @@ class Params:
                  FSH=0.5,               ## Fallback parameter
                  ALPHA=0.01,            ## Viscosity parameter
                  TOL=1e-3,              ## Numerical tolerance, approximated by RK1/2 difference
-                 SIGMA_ATOL = 3e-3,          ## surface density absolute tolerance
-                 ENTROPY_ATOL = 20*KB/MP,        ## entropy absolute tolerance
+                 SIGMA_ATOL = 0,          ## surface density absolute tolerance
+                 ENTROPY_ATOL = 0,        ## entropy absolute tolerance
                  MAXIT=1000,            ## Max number of iterations for adapative timestepping
                  load=None,             ## Option to load parameter file from pre-existing one
                  EOS_TABLE="EOS", ## What EOS table to use
@@ -48,18 +48,13 @@ class Params:
 
                  M0=0.01,
                  TV0=0.05,
-                 SIGMA_FLOOR=1e-2
+                 SIGMA_FLOOR=0
                  ):
 
         ## blah blah blah blah
 
         self.SIGMA_ATOL = SIGMA_ATOL
         self.ENTROPY_ATOL = ENTROPY_ATOL
-
-        if self.SIGMA_ATOL is None:
-            self.SIGMA_ATOL = 0.1*SIGMA_FLOOR
-        if self.ENTROPY_ATOL is None:
-            self.ENTROPY_ATOL = 10*KB/MP
 
         self._pdict = {"MBH": float(MBH),
                            "R0": float(R0),

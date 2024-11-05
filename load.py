@@ -46,18 +46,19 @@ class LoadSimulation:
             self.glob_entropy = sorted(glob.glob(self.sim_dir + "/entropy.*.dat"))
             ## want to make homogeneous
             self.ts_by_file = [np.loadtxt(f, skiprows=1, usecols=0) for f in self.glob_sigma]
-            max_num = np.max([len(ts) for ts in self.ts_by_file])
+            print(self.ts_by_file)
+            max_num = np.max([np.size(ts) for ts in self.ts_by_file])
 
-            
             for i, ts in enumerate(self.ts_by_file):
-                lts = len(ts)
-                if not len(ts) == max_num:
+                lts = np.size(ts)
+
+                if not np.size(ts) == max_num:
                     diff = int(max_num-lts)
                     self.ts_by_file[i] = np.append(self.ts_by_file[i], -np.inf*np.ones(diff))
+
             self.ts_by_file = np.array(self.ts_by_file)
             self.ts = self.ts_by_file.flatten() ## ugly as shit
             self.ts = self.ts[np.logical_not(np.isinf(self.ts))]
-            self.grid = Grid(grid_array=np.loadtxt(self.glob_sigma[0], max_rows=1), params=params)
         else:
             self.ts = np.load(os.path.abspath(self.sim_dir+"/tsave.npy"), mmap_mode="r")
         if t0 is None:
@@ -65,8 +66,18 @@ class LoadSimulation:
         if tf is None:
             tf = self.ts[-1]
 
+        self.grid = Grid(params=params)
+
         comparr = []
 
+        def am_distribution(x, f):
+            mu = np.log(self.params.LC / f + self.params.LMIN)
+            sigma2 = 2 * np.log((self.params.LC + self.params.LMIN) / (self.params.LC / f + self.params.LMIN))
+            return 1 / (x - self.params.LMIN) / np.sqrt(sigma2 * 2 * np.pi) * np.exp(-(np.log(x - self.params.LMIN) - mu) ** 2 / 2 / sigma2)
+        def spec_ang(x):
+            return np.sqrt(CONST_G * self.params.MBH * x ** 2 / (x - self.params.RSCH))
+        def dl_dr(x):
+            return np.sqrt(CONST_G * self.params.MBH / (x - self.params.RSCH)) - 0.5 * x * np.sqrt(CONST_G * self.params.MBH / (x - self.params.RSCH) ** 3)
         def mass_distribution(x, f):
             am_x = spec_ang(x)
             am_dist = am_distribution(am_x, f)
@@ -74,10 +85,12 @@ class LoadSimulation:
             result = np.where(np.logical_or(np.isnan(result), np.isinf(result)), 0, result)
             result = np.where(result < 0, 0, result)
             return result
-	self.mass_distribution = mass_distribution(self.grid.r_cell, self.params.SIGMAF)
+
+        self.mass_distribution = mass_distribution(self.grid.r_cell, self.params.SIGMAF)
 
         if tindex is not None:
             comparr = np.array(self.ts)[tindex]
+
         elif mode.__eq__("CONST"):
             comparr = np.append(np.arange(t0, tf, dt), tf)
         elif mode.__eq__("LINEAR"):
@@ -115,8 +128,13 @@ class LoadSimulation:
                 ca_proj = np.einsum("i,j->ij", t_comp, np.ones(t_arr.shape))
                 indices = np.unique(np.argmin(np.abs(ts_proj - ca_proj), axis=1))
 
-                sigma_read = np.loadtxt(self.glob_sigma[i], skiprows=1)[:,1:][indices]
-                entropy_read = np.loadtxt(self.glob_entropy[i], skiprows=1)[:,1:][indices]
+                sigma_read = None; entropy_read = None
+
+                try:
+                    sigma_read = np.loadtxt(self.glob_sigma[i], skiprows=1)[:,1:][indices]
+                    entropy_read = np.loadtxt(self.glob_entropy[i], skiprows=1)[:,1:][indices]
+                except:
+                    continue
 
                 if not self.sigma.size and not self.s.size:
                     self.sigma = np.array(sigma_read)
@@ -167,8 +185,6 @@ class LoadSimulation:
 
         self.nuL_nu = np.einsum("j,ij->ij", self.nuf, self.L_nu)
         self.nuL_nu_scat = np.einsum("j,ij->ij", self.nuf, self.L_nu_scat)
-
-
 
         self.sigv = sig((self.be - params.BE_CRIT) / params.DBE)
         ## calculates velocities at inter_faces
@@ -221,12 +237,20 @@ class LoadSimulation:
         self.qrad = qrad/self.sigma
         self.qwind = qwind/self.sigma
 
+        ## calculates advective flux
+        sigma_face = vector_interp(self.grid.r_face, self.grid.r_cell, self.sigma)
+        sigma_flux = sigma_face*self.vr
+        net_sigma_flux = np.zeros(self.sigma.shape)
+
+        net_sigma_flux[:,1:-1] = (sigma_flux[:, :-1]*self.grid.face_area[:-1] - sigma_flux[:, 1:]*self.grid.face_area[1:]) / self.grid.cell_vol[1:-1]
+        self.sigma_adv = net_sigma_flux
+
         ## calculates advective cooling
         ts_face = vector_interp(self.grid.r_face, self.grid.r_cell, self.sigma*self.s)
         ts_flux = ts_face*self.vr
-        net_flux = np.zeros(self.sigma.shape)
+        net_ts_flux = np.zeros(self.sigma.shape)
 
-        net_flux[:, 1:-1] = self.T[:, 1:-1]*(ts_flux[:,:-1]*self.grid.face_area[:-1] - ts_flux[:, 1:]*self.grid.face_area[1:])/self.grid.cell_vol[1:-1]
-        self.qadv = net_flux/self.sigma
+        net_ts_flux[:, 1:-1] = self.T[:, 1:-1]*(ts_flux[:,:-1]*self.grid.face_area[:-1] - ts_flux[:, 1:]*self.grid.face_area[1:])/self.grid.cell_vol[1:-1]
+        self.qadv = net_ts_flux/self.sigma
 
         self.ts_dot = (qvis + qfb - qrad - qwind) / self.T

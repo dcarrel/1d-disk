@@ -68,13 +68,12 @@ class Simulation:
 
         ## probably not that good of an approximation
         ## just don't want ts or sigma to be negative
-        ts_arr = -(self.params.SDT*self.var0.ts/(self.var0.ts_dot+1e-50))[1:-1]
-        ts_arr = np.where(ts_arr < 0, np.inf, ts_arr)
+        ts_arr = np.abs(self.params.SDT*self.var0.ts/(self.var0.ts_dot+1e-50))[1:-1]
         ts_loc = np.argmin(ts_arr)
         ts_dt = ts_arr[ts_loc]
         if not self.params.EVOLVE_ENTROPY: ts_dt=np.inf
 
-        sigma_arr = -(self.params.SDT*self.var0.sigma/(self.var0.sigma_dot+1e-50))[1:-1]
+        sigma_arr = np.abs(self.params.SDT*self.var0.sigma/(self.var0.sigma_dot+1e-50))[1:-1]
         sigma_arr = np.where(sigma_arr < 0, np.inf, sigma_arr)
         sigma_loc = np.argmin(sigma_arr)
         sigma_dt = sigma_arr[sigma_loc]
