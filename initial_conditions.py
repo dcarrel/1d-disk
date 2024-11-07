@@ -20,7 +20,7 @@ def analytic_solution(M0, R0, TVISC):
     return func
 
 class InitialCondition:
-    def __init__(self, m0=0.01, eff=1.1, params=Params(), tf=1*MONTH, load_from=None,
+    def __init__(self, m0=0.005, eff=1.1, params=Params(), tf=1*MONTH, load_from=None,
                  save_dir=None, verbose=True, evolve=True, progress_message=None, sigfloor=1e-2):
         self.load_from = load_from
         self.params=params
@@ -63,21 +63,22 @@ class InitialCondition:
                 result = np.where(result < 0, 0, result)
                 return result
 
-            mass_distribution = mass_distribution(self.grid.r_cell, eff)*m0*MSUN
+            mass_distribution = mass_distribution(self.grid.r_cell, eff)*m0
 
             self.sigma0 = mass_distribution + sigfloor
+            rmax = self.grid.r_cell[np.argmax(self.sigma0)]
+            self.sigma0[self.grid.r_cell <= rmax] = np.max(self.sigma0)
             self.params=params
             self.eos = load_table(self.params.EOS_TABLE)
 
             ## sets up entropy profile in a thick state
             h0 = np.sqrt((params.BE_CRIT+1)/8)
-            h0 *= 1#self.sigma0/np.max(self.sigma0)+1e-3
+            h0 *= self.sigma0/np.max(self.sigma0)+1e-3
             density0 = self.sigma0/2/h0/self.grid.r_cell
             chi0 = self.sigma0*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
 
             temperature = get_temperature_from_density(1000*self.grid.cell_ones(), chi0, density0)
             self.entropy0 = entropy_difference(temperature, chi0, None, just_estimate=True)
-            self.entropy0 = np.max(self.entropy0)*self.sigma0/np.max(self.sigma0)+5e12
 
 
             ic_pdict = self.params._pdict.copy()
@@ -86,6 +87,7 @@ class InitialCondition:
             ic_pdict["SAVE"] = False
             ic_pdict["TF"] = tf
             ic_pdict["SIM_DIR"] = save_dir
+            ic_pdict["TOL"] = 1e-4
             self.params = Params(load=ic_pdict)
 
             self.sim = Simulation(self.sigma0, self.entropy0, params=self.params, verbose=verbose,

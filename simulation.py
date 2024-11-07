@@ -60,6 +60,7 @@ class Simulation:
         dr = []
         if self.params.GEOMETRY.__eq__("LOGARITHMIC"):
             dr_left = self.grid.r_face - self.grid.r_cell[:-1]
+            dr_left[0] = np.inf ## used for calculating cfl
             dr_right = self.grid.r_cell[1:] - self.grid.r_face
             dr = np.where(self.var0.vr < 0, dr_left, dr_right)
         elif self.params.GEOMETRY.__eq__("LINEAR"):
@@ -135,7 +136,7 @@ class Simulation:
             tol_max = 100*self.params.TOL
             m = np.log10(tol_min/tol_max)/np.log10(sig_max/sig_min)
             log_tol = m*(np.log10(sigma_full[1:-1]/sig_min)) + np.log10(tol_max)
-            tol = 10**log_tol if self.params.EVOLVE_SIGMA else self.params.TOL
+            tol = 10**log_tol
 
             ts_tol = ts_full[1:-1]*tol + self.params.ENTROPY_ATOL*sigma_full[1:-1]
             sigma_tol = sigma_full[1:-1]*tol + self.params.SIGMA_ATOL
