@@ -135,7 +135,7 @@ class Simulation:
             tol_max = 100*self.params.TOL
             m = np.log10(tol_min/tol_max)/np.log10(sig_max/sig_min)
             log_tol = m*(np.log10(sigma_full[1:-1]/sig_min)) + np.log10(tol_max)
-            tol = 10**log_tol
+            tol = 10**log_tol if self.params.EVOLVE_SIGMA else self.params.TOL
 
             ts_tol = ts_full[1:-1]*tol + self.params.ENTROPY_ATOL*sigma_full[1:-1]
             sigma_tol = sigma_full[1:-1]*tol + self.params.SIGMA_ATOL
