@@ -67,7 +67,7 @@ class Simulation:
 
         ## probably not that good of an approximation
         ## just don't want ts or sigma to be negative
-        ts_arr = self.params.SDT*self.var0.ts/(self.var0.ts_dot+1e-50)[1:-1]
+        ts_arr = (self.params.SDT*self.var0.ts/(self.var0.ts_dot+1e-50))[1:-1]
         ts_arr = np.where(ts_arr > 0, np.inf, -ts_arr)
         ts_loc = np.argmin(ts_arr)
         ts_dt = ts_arr[ts_loc]
@@ -128,8 +128,17 @@ class Simulation:
             if self.params.EVOLVE_SIGMA: sigma_full = shasta_step(sigma, vf_half, self.dt, interp=self.params.INTERP,
                                                                   dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
 
-            ts_tol = ts_full[1:-1]*self.params.TOL + self.params.ENTROPY_ATOL*sigma_full[1:-1]
-            sigma_tol = sigma_full[1:-1]*self.params.TOL + self.params.SIGMA_ATOL
+
+            sig_max = 50
+            sig_min = 1
+            tol_min = self.params.TOL
+            tol_max = 100*self.params.TOL
+            m = np.log10(tol_min/tol_max)/np.log10(sig_max/sig_min)
+            log_tol = m*(np.log10(sigma_full[1:-1]/sig_min)) + np.log10(tol_max)
+            tol = 10**log_tol
+
+            ts_tol = ts_full[1:-1]*tol + self.params.ENTROPY_ATOL*sigma_full[1:-1]
+            sigma_tol = sigma_full[1:-1]*tol + self.params.SIGMA_ATOL
 
             ts_err = ts_tol - np.abs(ts_full_o1[1:-1] - ts_full[1:-1])
             sigma_err = sigma_tol - np.abs(sigma_full_o1[1:-1] - sigma_full[1:-1])
@@ -171,7 +180,8 @@ class Simulation:
                     loc = [min_ts_loc, min_sigma_loc][which_to_use]
                 break
 
-        self.t += np.minimum(np.minimum(self.dt, self.params.TF-self.t), np.min(self.tsave)-self.t)
+        save_dt = np.maximum(np.inf if not self.params.EVOLVE_SIGMA else 0, np.min(self.tsave)-self.t)
+        self.t += np.minimum(np.minimum(self.dt, self.params.TF-self.t), save_dt)
         self.var0.update_variables(sigma_full, ts_full, t=self.t)
         ## returns timestep, reason for minimum timestep, location, sigma_error, ts_error
         return self.dt, st, loc, max_sigma_err, max_ts_err

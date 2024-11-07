@@ -38,6 +38,8 @@ class FullVariable:
             return result
 
         self.mass_distribution = mass_distribution(self.grid.r_cell, self.params.SIGMAF)
+        cutoff = 1#np.maximum(1, np.exp(-(self.grid.r_cell/5/self.params.RC)**2))
+        self.mass_distribution *= cutoff
 
     def update_variables(self, sigma, ts, t=0):
         self.sigma = sigma
@@ -53,7 +55,7 @@ class FullVariable:
 
         #self.s = np.where(self.s<ENTROPY_MIN, ENTROPY_MIN, self.s)
         self.sigma[below_floor] = self.params.SIGMA_FLOOR
-        self.sigma[-2] = self.sigma[-1]
+        self.sigma[-1] = self.sigma[-2]
         self.ts = self.s*self.sigma
         self.t = t
         self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
@@ -94,8 +96,8 @@ class FullVariable:
         ## defined at the cell centers
         self.vr = np.zeros(sigma.shape)[1:]
         self.vr[:] = -d_tild[:] * g_tild[:] / lc_sigma_tild[:] * (lc_sigma[1:] / g[1:] - lc_sigma[:-1] / g[:-1])/self.grid.ddr[:]
-        self.vr[0] = np.minimum(0, self.vr[0])
-        self.vr[-1] = np.maximum(0, self.vr[-1])
+        #self.vr[0] = np.minimum(0, self.vr[0])
+        #self.vr[-1] = np.maximum(0, self.vr[-1])
         #self.vr[0] = self.vr[1]
 
 

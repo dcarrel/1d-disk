@@ -195,7 +195,7 @@ class Params:
 
         self.CAPTURE=True if self.RT < self.RSCH else False
         self.R0 = 3*self.RSCH
-        self.RF = 50*self.RT
+        self.RF = 500*self.RT
 
 
         if PRINT and not self.FALLBACK_FAILURE:

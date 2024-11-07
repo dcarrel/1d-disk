@@ -66,7 +66,7 @@ class InitialCondition:
 
             ## sets up entropy profile in a thick state
             h0 = np.sqrt((params.BE_CRIT+1)/8)
-            h0 *= self.sigma0/sigma0_max+1e-3
+            h0 *= 1#self.sigma0/sigma0_max+1e-3
             density0 = self.sigma0/2/h0/self.grid.r_cell
             chi0 = self.sigma0*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
 
