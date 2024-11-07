@@ -20,9 +20,11 @@ def analytic_solution(M0, R0, TVISC):
     return func
 
 class InitialCondition:
-    def __init__(self, m0=0.01, tv=1, ambf=1e-5, params=Params(), tf=1*MONTH, load_from=None,
-                 save_dir=None, verbose=True, evolve=True, progress_message=None):
+    def __init__(self, m0=0.01, eff=1.1, params=Params(), tf=1*MONTH, load_from=None,
+                 save_dir=None, verbose=True, evolve=True, progress_message=None, sigfloor=1e-2):
         self.load_from = load_from
+        self.params=params
+
         if save_dir is None and load_from is not None:
             save_dir = load_from
         if save_dir is None and load_from is None:
@@ -39,39 +41,43 @@ class InitialCondition:
             self.sigma0, self.entropy0 = np.load(directory+"/ics.npy")
         else:
             self.grid = Grid(params=params)
-            self.sigma0 = analytic_solution(m0*params.MSTAR, 2*params.RP, tv)(self.grid.r_cell)
+
+            def am_distribution(x, f):
+                mu = np.log(self.params.LC / f + self.params.LMIN)
+                sigma2 = 2 * np.log((self.params.LC + self.params.LMIN) / (self.params.LC / f + self.params.LMIN))
+                return 1 / (x - self.params.LMIN) / np.sqrt(sigma2 * 2 * np.pi) * np.exp(
+                    -(np.log(x - self.params.LMIN) - mu) ** 2 / 2 / sigma2)
+
+            def spec_ang(x):
+                return np.sqrt(CONST_G * self.params.MBH * x ** 2 / (x - self.params.RSCH))
+
+            def dl_dr(x):
+                return np.sqrt(CONST_G * self.params.MBH / (x - self.params.RSCH)) - 0.5 * x * np.sqrt(
+                    CONST_G * self.params.MBH / (x - self.params.RSCH) ** 3)
+
+            def mass_distribution(x, f):
+                am_x = spec_ang(x)
+                am_dist = am_distribution(am_x, f)
+                result = am_dist * dl_dr(x) / 2 / np.pi / x
+                result = np.where(np.logical_or(np.isnan(result), np.isinf(result)), 0, result)
+                result = np.where(result < 0, 0, result)
+                return result
+
+            mass_distribution = mass_distribution(self.grid.r_cell, eff)*m0*MSUN
+
+            self.sigma0 = mass_distribution + sigfloor
             self.params=params
             self.eos = load_table(self.params.EOS_TABLE)
 
-            ## sets the power law profile in the ambient region
-            sigma0_max = np.max(self.sigma0)
-            sigma0_crit = ambf*sigma0_max
-            disk_body = np.where(self.sigma0 > ambf*sigma0_max, 1, 0)
-            bdy1 = np.argmax(disk_body)
-            r1 = self.grid.r_cell[bdy1]
-            bdy2 = len(self.sigma0) - np.argmax(disk_body[::-1])-1
-            r2 = self.grid.r_cell[bdy2]
-
-            def to_min(r):
-                sigma_floor = np.maximum(self.params.SIGMA_FLOOR, 1)
-                a = 3
-                f = (r[0]/r1)**a
-                sigf = sigma_floor-sigma0_crit*f/(1-f)
-                return (sigma0_crit - sigf)*(r/r1)**a+sigf
-
-
-            if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, to_min(self.grid.r_cell), self.sigma0)
-           # if r1 < 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell < r1, sigma0_crit, self.sigma0)
-            if r2 > 2*self.params.RP: self.sigma0 = np.where(self.grid.r_cell > r2, sigma0_crit*(self.grid.r_cell/r2)**-3, self.sigma0)
-
             ## sets up entropy profile in a thick state
             h0 = np.sqrt((params.BE_CRIT+1)/8)
-            h0 *= 1#self.sigma0/sigma0_max+1e-3
+            h0 *= 1#self.sigma0/np.max(self.sigma0)+1e-3
             density0 = self.sigma0/2/h0/self.grid.r_cell
             chi0 = self.sigma0*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
 
             temperature = get_temperature_from_density(1000*self.grid.cell_ones(), chi0, density0)
             self.entropy0 = entropy_difference(temperature, chi0, None, just_estimate=True)
+            self.entropy0 = np.max(self.entropy0)*self.sigma0/np.max(self.sigma0)+5e12
 
 
             ic_pdict = self.params._pdict.copy()
@@ -80,7 +86,6 @@ class InitialCondition:
             ic_pdict["SAVE"] = False
             ic_pdict["TF"] = tf
             ic_pdict["SIM_DIR"] = save_dir
-            ic_pdict["TOL"] = 1e-2
             self.params = Params(load=ic_pdict)
 
             self.sim = Simulation(self.sigma0, self.entropy0, params=self.params, verbose=verbose,
