@@ -41,19 +41,23 @@ class FullVariable:
 
     def update_variables(self, sigma, ts, t=0):
         self.sigma = sigma
-        self.sigma[0] = self.sigma[1]#*(self.grid.r_cell[1]/self.grid.r_cell[0]) ## ratio
-        self.sigma = np.where(self.sigma<self.params.SIGMA_FLOOR, self.params.SIGMA_FLOOR, self.sigma)
+        below_floor = self.sigma < self.params.SIGMA_FLOOR
 
-        self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
         self.ts = ts
         self.s = np.ones(self.ts.shape)
-        self.s[1:] = self.ts[1:]/self.sigma[1:]
+        self.s[1:-1] = self.ts[1:-1]/self.sigma[1:-1]
         self.s[0] = self.s[1]
+        self.s[-1] = self.s[-2]
+
+        self.s[self.s<self.params.ENTROPY_ATOL] = self.params.ENTROPY_ATOL
 
         #self.s = np.where(self.s<ENTROPY_MIN, ENTROPY_MIN, self.s)
+        self.sigma[below_floor] = self.params.SIGMA_FLOOR
+        self.sigma[-2] = self.sigma[-1]
         self.ts = self.s*self.sigma
         self.t = t
-
+        self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
+        
         self.T = self.eos(self.chi, self.s)
 
         self.rho = entropy_difference(self.T, self.chi, self.s, just_density=True)
@@ -91,6 +95,7 @@ class FullVariable:
         self.vr = np.zeros(sigma.shape)[1:]
         self.vr[:] = -d_tild[:] * g_tild[:] / lc_sigma_tild[:] * (lc_sigma[1:] / g[1:] - lc_sigma[:-1] / g[:-1])/self.grid.ddr[:]
         self.vr[0] = np.minimum(0, self.vr[0])
+        self.vr[-1] = np.maximum(0, self.vr[-1])
         #self.vr[0] = self.vr[1]
 
 
@@ -112,7 +117,7 @@ class FullVariable:
         self.qwind = self.params.FWIND*self.grid.omgko*self.sigv*self.sigma*self.grid.vk2o  # wind cooling
         if not self.params.WIND_ON: self.qwind *= 0
         self.qvis = 2.25*self.nu*self.grid.omgko**2*self.sigma  # viscous cooling
-        self.qfb = 0.5*sigma_fb*self.grid.vk2o# fallback heating
+        self.qfb = 0.5*sigma_fb*self.grid.vk2o  # fallback heating
         if not self.params.FB_ON: self.qfb *= 0
 
         self.ts_dot = (self.qvis+self.qfb-self.qrad-self.qwind)/self.T

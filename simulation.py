@@ -1,4 +1,4 @@
-import os, sys, glob
+import os, sys, glob, time
 import numpy as np
 from grid import *
 from variable import *
@@ -9,13 +9,13 @@ class Simulation:
     def __init__(self, sigma0, entropy0, params=Params(), verbose=True, progress_message=None):
         self.verbose = verbose
         ## sets up simulation directory
-        if not os.path.isdir(os.path.join(os.path.dirname(__file__), params.SIM_DIR)):
-            os.makedirs(os.path.join(os.path.dirname(__file__), params.SIM_DIR))
+        if not os.path.isdir(params.SIM_DIR):
+            os.makedirs(params.SIM_DIR)
 
-        self.sim_dir = os.path.join(os.path.dirname(__file__), params.SIM_DIR)
+        self.sim_dir = params.SIM_DIR
         self.params=params
-        self.sigmafd = os.path.join(os.path.dirname(__file__), params.SIM_DIR + "/sigma.000.dat")
-        self.entropyfd = os.path.join(os.path.dirname(__file__), params.SIM_DIR + "/entropy.000.dat")
+        self.sigmafd = os.path.join(params.SIM_DIR, "sigma.000.dat")
+        self.entropyfd = os.path.join(params.SIM_DIR, "entropy.000.dat")
         self.dt = np.inf
         self.progress_message=progress_message
 
@@ -42,13 +42,12 @@ class Simulation:
                 for f in old_dat:
                     os.remove(f)
 
-                sigmafile = open(self.sigmafd, "w")
-                sigmafile.write(arr_to_string(self.grid.r_cell) + arr_to_string(sigma0, t=self.t))
-                sigmafile.close()
+                with open(self.sigmafd, "w") as sigmafile:
+                    sigmafile.write(arr_to_string(self.grid.r_cell) + arr_to_string(sigma0, t=self.t))
 
-                sfile = open(self.entropyfd, "w")
-                sfile.write(arr_to_string(self.grid.r_cell) + arr_to_string(entropy0, t=self.t))
-                sfile.close()
+                with open(self.entropyfd, "w") as sfile:
+                    sfile.write(arr_to_string(self.grid.r_cell) + arr_to_string(entropy0, t=self.t))
+
 
         self.tsave = np.append(np.arange(self.t, self.params.TF, params.TS), [self.params.TF])
         self.tsave[0] = 3*self.params.TF  ## Initial data is already saved, this makes sure that it is not saved again I guess
@@ -68,13 +67,14 @@ class Simulation:
 
         ## probably not that good of an approximation
         ## just don't want ts or sigma to be negative
-        ts_arr = np.abs(self.params.SDT*self.var0.ts/(self.var0.ts_dot+1e-50))[1:-1]
+        ts_arr = self.params.SDT*self.var0.ts/(self.var0.ts_dot+1e-50)[1:-1]
+        ts_arr = np.where(ts_arr > 0, np.inf, -ts_arr)
         ts_loc = np.argmin(ts_arr)
         ts_dt = ts_arr[ts_loc]
         if not self.params.EVOLVE_ENTROPY: ts_dt=np.inf
 
-        sigma_arr = np.abs(self.params.SDT*self.var0.sigma/(self.var0.sigma_dot+1e-50))[1:-1]
-        sigma_arr = np.where(sigma_arr < 0, np.inf, sigma_arr)
+        sigma_arr = (self.params.SDT*self.var0.sigma/(self.var0.sigma_dot+1e-50))[1:-1]
+        sigma_arr = np.where(sigma_arr > 0, np.inf, -sigma_arr)
         sigma_loc = np.argmin(sigma_arr)
         sigma_dt = sigma_arr[sigma_loc]
         if not self.params.EVOLVE_SIGMA: sigma_dt = np.inf
@@ -128,7 +128,7 @@ class Simulation:
             if self.params.EVOLVE_SIGMA: sigma_full = shasta_step(sigma, vf_half, self.dt, interp=self.params.INTERP,
                                                                   dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
 
-            ts_tol = ts_full[1:-1]*self.params.TOL + self.params.ENTROPY_ATOL*self.params.SIGMA_FLOOR
+            ts_tol = ts_full[1:-1]*self.params.TOL + self.params.ENTROPY_ATOL*sigma_full[1:-1]
             sigma_tol = sigma_full[1:-1]*self.params.TOL + self.params.SIGMA_ATOL
 
             ts_err = ts_tol - np.abs(ts_full_o1[1:-1] - ts_full[1:-1])
@@ -149,8 +149,10 @@ class Simulation:
 
             err_condition = np.any(ts_err < 0) or np.any(sigma_err < 0)
             inv_condition = is_invalid(ts_full) or is_invalid(sigma_full)
+            neg_condition = np.any(ts_full < sigma_full*self.params.ENTROPY_ATOL) \
+                                 or np.any(sigma_full < self.params.SIGMA_FLOOR)
 
-            if err_condition or inv_condition:
+            if (err_condition or inv_condition) or neg_condition:
                 self.dt *= 0.9
                 n += 1
                 bk=True
@@ -169,7 +171,7 @@ class Simulation:
                     loc = [min_ts_loc, min_sigma_loc][which_to_use]
                 break
 
-        self.t += np.minimum(self.dt, self.params.TF-self.t)
+        self.t += np.minimum(np.minimum(self.dt, self.params.TF-self.t), np.min(self.tsave)-self.t)
         self.var0.update_variables(sigma_full, ts_full, t=self.t)
         ## returns timestep, reason for minimum timestep, location, sigma_error, ts_error
         return self.dt, st, loc, max_sigma_err, max_ts_err
@@ -182,8 +184,10 @@ class Simulation:
 
             old_sigma, old_entropy = [], []
 
+            tst0 = time.process_time()
             dt, st, loc, sig_err, ts_err = self.take_step()
-
+            dtts = time.process_time() - tst0
+    
             new_sigma, new_entropy = [], []
 
 
@@ -194,24 +198,28 @@ class Simulation:
                 sigmafile.close()
                 sfile.close()
                 n = np.argmin(self.file_start)
-                self.sigmafd = os.path.join(os.path.dirname(__file__), self.params.SIM_DIR + f"/sigma.{n:03d}.dat")
-                self.entropyfd = os.path.join(os.path.dirname(__file__), self.params.SIM_DIR + f"/entropy.{n:03d}.dat")
+                self.sigmafd = os.path.join(self.params.SIM_DIR, f"sigma.{n:03d}.dat")
+                self.entropyfd = os.path.join(self.params.SIM_DIR, f"entropy.{n:03d}.dat")
+                
+                self.sigmafd = os.path.abspath(self.sigmafd)
+                self.entropyfd = os.path.abspath(self.entropyfd)
 
-                sigmafile = open(self.sigmafd, "w")
-                sigmafile.write(arr_to_string(self.grid.r_cell)) ## write grid locations
-                sigmafile.close()
+                with open(self.sigmafd, "w") as sigmafile:
+                    sigmafile.write(arr_to_string(self.grid.r_cell)) ## write grid locations
 
-                sfile = open(self.entropyfd, "w")
-                sfile.write(arr_to_string(self.grid.r_cell))
-                sfile.close()
 
-                sigmafile = open(self.sigmafd, "a")
-                sfile = open(self.entropyfd, "a")
+                with open(self.entropyfd, "w") as sfile:
+                    sfile.write(arr_to_string(self.grid.r_cell))
+
+
                 self.file_start[n] = 3*self.params.TF
 
             if np.any(cond) and self.params.SAVE:
-                sigmafile.write(arr_to_string(self.var0.sigma, t=self.t))
-                sfile.write(arr_to_string(self.var0.s, t=self.t))
+                with open(self.sigmafd, "a") as sigmafile:
+                    sigmafile.write(arr_to_string(self.var0.sigma, t=self.t))
+                    
+                with open(self.entropyfd, "a") as sfile:
+                    sfile.write(arr_to_string(self.var0.s, t=self.t))
 
                 self.tsave = np.where(cond, self.params.TF*3, self.tsave)
 
@@ -222,10 +230,11 @@ class Simulation:
                 if self.progress_message is not None:
                     self.progress_message[1] = self.t / self.params.TF * 100  ## percentage done
                     self.progress_message[2] = dt / (self.params.TF - self.t0) ## timestep
-                    self.progress_message[3] = st
-                    self.progress_message[4] = loc
-                    self.progress_message[5] = sig_err
-                    self.progress_message[6] = ts_err
+                    self.progress_message[3] = dtts
+                    self.progress_message[4] = st
+                    self.progress_message[5] = loc
+                    self.progress_message[6] = sig_err
+                    self.progress_message[7] = ts_err
                 else:
                     message = f"\rpct: {(self.t / self.params.TF * 100):2.2f}%\tdt={dt / (self.params.TF - self.t0):2.2e}\t{st}\tloc={loc:2.2f}"+f"\tsig {sig_err:2.2e}\tts {ts_err:2.2e}\t\t\t\t\t"
                     print(message, end="")
@@ -250,7 +259,7 @@ class Simulation:
                 sigma_array = np.loadtxt(sigma_files[0], skiprows=1)[:, 1:]
                 entropy_array = np.loadtxt(entropy_files[0], skiprows=1)[:, 1:]
                 t_array = np.loadtxt(entropy_files[0], skiprows=1, usecols=0)
-                np.save(os.path.abspath(self.sim_dir+"/r_cell.npy"), np.loadtxt(entropy_files[0], max_rows=1))
+                np.save(os.path.join(self.sim_dir,"r_cell.npy"), np.loadtxt(entropy_files[0], max_rows=1))
 
             for s, e in zip(sigma_files, entropy_files):
                 sigma_array = np.vstack((sigma_array, np.loadtxt(s, skiprows=1)[:, 1:]))
@@ -260,9 +269,9 @@ class Simulation:
                 os.remove(s)
                 os.remove(e)
 
-            np.save(os.path.abspath(self.sim_dir+"/sigma.npy"), sigma_array)
-            np.save(os.path.abspath(self.sim_dir+"/entropy.npy"), entropy_array)
-            np.save(os.path.abspath(self.sim_dir+"/tsave.npy"), t_array)
+            np.save(os.path.join(self.sim_dir,"sigma.npy"), sigma_array)
+            np.save(os.path.join(self.sim_dir,"entropy.npy"), entropy_array)
+            np.save(os.path.join(self.sim_dir,"tsave.npy"), t_array)
 
 def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True, sigma_floor=1e-3):
     ## add different interpolation options at some point, probably will not really matter
@@ -281,13 +290,13 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True, sigma
     var_ast = var.grid.cell_zeros()
     var_ast[1:-1] = var.data[1:-1]
     var_ast[1:-1] += (-dt*var.grid.face_area[1:]*vf[1:]*var_face[1:]+dt*var.grid.face_area[:-1]*vf[:-1]*var_face[:-1])/var.grid.cell_vol[1:-1]
-    var_ast[0] = var_ast[1]*a+sigma_floor*(1-a)
+    var_ast[0] = var_ast[1]
     var_ast[-1] = var_ast[-2]
 
     ## transport update
     var_T = var.grid.cell_zeros()
     var_T[1:-1] = var_ast[1:-1] + dt * var.D[1:-1]
-    var_T[0] = var_T[1]*a+sigma_floor*(1-a)
+    var_T[0] = var_T[1]
     var_T[-1] = var_T[-2]
 
     ## diffusive variables
@@ -302,7 +311,7 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True, sigma
     var_tild[1:-1] = var_T[1:-1]
     var_tild[1:-1] += (nu_face[1:]*vol_face[1:]*(var.data[2:]-var.data[1:-1]) -
                        nu_face[:-1]*vol_face[:-1]*(var.data[1:-1] - var.data[:-2]))/var.grid.cell_vol[1:-1]
-    var_tild[0] = var_tild[1]*a+sigma_floor*(1-a)
+    var_tild[0] = var_tild[1]
     var_tild[-1] = var_tild[-2]
     ## flux correction
     sign_face = np.sign(var_tild[1:] - var_tild[:-1])
@@ -318,7 +327,7 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True, sigma
 
     var_ret = np.zeros(var.grid.r_cell.shape)
     var_ret[1:-1] = var_tild[1:-1] - var.grid.cell_vol[1:-1]**-1*(flux_face[1:] - flux_face[:-1])
-    var_ret[0] = var_ret[1]*a+sigma_floor*(1-a)
+    var_ret[0] = var_ret[1]
     var_ret[-1] = var_ret[-2]
 
     return var_ret

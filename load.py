@@ -46,7 +46,6 @@ class LoadSimulation:
             self.glob_entropy = sorted(glob.glob(self.sim_dir + "/entropy.*.dat"))
             ## want to make homogeneous
             self.ts_by_file = [np.loadtxt(f, skiprows=1, usecols=0) for f in self.glob_sigma]
-            print(self.ts_by_file)
             max_num = np.max([np.size(ts) for ts in self.ts_by_file])
 
             for i, ts in enumerate(self.ts_by_file):

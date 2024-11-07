@@ -53,9 +53,10 @@ class InitialCondition:
             r2 = self.grid.r_cell[bdy2]
 
             def to_min(r):
+                sigma_floor = np.maximum(self.params.SIGMA_FLOOR, 1)
                 a = 3
                 f = (r[0]/r1)**a
-                sigf = self.params.SIGMA_FLOOR-sigma0_crit*f/(1-f)
+                sigf = sigma_floor-sigma0_crit*f/(1-f)
                 return (sigma0_crit - sigf)*(r/r1)**a+sigf
 
 

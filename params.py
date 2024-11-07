@@ -12,12 +12,12 @@ class Params:
                  NR=500,                ## Number of grid points
                  T0=0,                  ## Initial time
                  TF=5*YEAR,             ## Final time
-                 TS=0.1*DAY,            ## Increment between saves
+                 TS= HOUR,            ## Increment between saves
                  SIM_DIR="MY_SIM",     ## File name
                  FILE_INT=0.1*YEAR,     ## Increment between different files (doesn't really matter)
                  RESTART=False,         ## Whether or not to restart, not really that useful
                  CFLDT = 0.7,           ## CFL number
-                 SDT = 0.5,             ## Source number, kind of like CFL number for sources
+                 SDT = 0.1,             ## Source number, kind of like CFL number for sources
                  BE_CRIT=-0.1,          ## Wind parameter
                  DBE=1/300,             ## Wind parameter
                  FWIND=0.5,             ## Wind parameter
@@ -194,9 +194,8 @@ class Params:
             self.A_SD = self.TOTAL_FALLBACK_MASS/self.A_ORB**2
 
         self.CAPTURE=True if self.RT < self.RSCH else False
-        self.R0 = 2*self.RSCH
-        self.RF = 5000*self.RSCH
-
+        self.R0 = 3*self.RSCH
+        self.RF = 50*self.RT
 
 
         if PRINT and not self.FALLBACK_FAILURE:
