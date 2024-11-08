@@ -55,6 +55,7 @@ class FullVariable:
 
         #self.s = np.where(self.s<ENTROPY_MIN, ENTROPY_MIN, self.s)
         self.sigma[below_floor] = self.params.SIGMA_FLOOR
+        self.sigma[0] = self.sigma[1]
         self.sigma[-1] = self.sigma[-2]
         self.ts = self.s*self.sigma
         self.t = t
@@ -94,8 +95,8 @@ class FullVariable:
 
 
         ## defined at the cell centers
-        self.vr = np.zeros(sigma.shape)[1:]
-        self.vr[:] = -d_tild[:] * g_tild[:] / lc_sigma_tild[:] * (lc_sigma[1:] / g[1:] - lc_sigma[:-1] / g[:-1])/self.grid.ddr[:]
+
+        self.vr = -d_tild * g_tild / lc_sigma_tild * (lc_sigma[1:] / g[1:] - lc_sigma[:-1] / g[:-1])/self.grid.ddr
         #self.vr[0] = np.minimum(0, self.vr[0])
         #self.vr[-1] = np.maximum(0, self.vr[-1])
         #self.vr[0] = self.vr[1]
@@ -124,8 +125,8 @@ class FullVariable:
 
         self.ts_dot = (self.qvis+self.qfb-self.qrad-self.qwind)/self.T
 
-        self.ts_dt = np.abs(self.ts[1:]/self.ts_dot[1:])
-        self.sigma_dt = np.abs(self.sigma[1:]/self.sigma_dot[1:])
+        self.ts_dt = np.abs(self.ts[1:-1]/self.ts_dot[1:-1])
+        self.sigma_dt = np.abs(self.sigma[1:-1]/self.sigma_dot[1:-1])
 
     def sigma_var(self):
         return ShastaVariable(self.grid, self.sigma, self.vr, self.sigma_dot)

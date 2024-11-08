@@ -311,7 +311,9 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True, sigma
     var_T[-1] = var_T[-2]
 
     ## diffusive variables
-    eps_face = 0.5*var.grid.face_area*vf*dt*(1/var.grid.cell_vol[:-1] + 1/var.grid.cell_vol[1:])
+    eps_face = var.grid.face_area*vf*dt*np.interp(np.log10(var.grid.r_face),
+                                                  np.log10(var.grid.r_cell),
+                                                  1/var.grid.cell_vol)
     nu_face = 1/6 + 1/3*eps_face**2
     mu_face = 1/6 - 1/6*eps_face**2
     mu_face *= diff
@@ -320,8 +322,12 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True, sigma
     ## diffusive update
     var_tild = var.grid.cell_zeros()
     var_tild[1:-1] = var_T[1:-1]
-    var_tild[1:-1] += (nu_face[1:]*vol_face[1:]*(var.data[2:]-var.data[1:-1]) -
-                       nu_face[:-1]*vol_face[:-1]*(var.data[1:-1] - var.data[:-2]))/var.grid.cell_vol[1:-1]
+#    var_tild[1:-1] += (nu_face[1:]*vol_face[1:]*(var.data[2:]-var.data[1:-1]) -
+#                       nu_face[:-1]*vol_face[:-1]*(var.data[1:-1] - var.data[:-2]))/var.grid.cell_vol[1:-1]
+    ## changed so it difffuses after the transport step
+    var_tild[1:-1] += (nu_face[1:]*vol_face[1:]*(var_T[2:]-var_T[1:-1]) -                                                
+                       nu_face[:-1]*vol_face[:-1]*(var_T[1:-1] - var_T[:-2]))/var.grid.cell_vol[1:-1]
+    
     var_tild[0] = var_tild[1]
     var_tild[-1] = var_tild[-2]
     ## flux correction

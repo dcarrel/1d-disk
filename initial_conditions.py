@@ -79,6 +79,7 @@ class InitialCondition:
 
             temperature = get_temperature_from_density(1000*self.grid.cell_ones(), chi0, density0)
             self.entropy0 = entropy_difference(temperature, chi0, None, just_estimate=True)
+            self.entropy0 = 1e12*self.grid.cell_ones()
 
 
             ic_pdict = self.params._pdict.copy()
