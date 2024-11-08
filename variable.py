@@ -19,8 +19,8 @@ class FullVariable:
 
     ## sets up mass distribution
         def am_distribution(x, f):
-            mu = np.log(self.params.LC / f + self.params.LMIN)
-            sigma2 = 2 * np.log((self.params.LC + self.params.LMIN) / (self.params.LC / f + self.params.LMIN))
+            mu = np.log(self.params.LC / f - self.params.LMIN)
+            sigma2 = 2 * np.log((self.params.LC - self.params.LMIN) / (self.params.LC / f - self.params.LMIN))
             return 1 / (x - self.params.LMIN) / np.sqrt(sigma2 * 2 * np.pi) * np.exp(-(np.log(x - self.params.LMIN) - mu) ** 2 / 2 / sigma2)
 
         def spec_ang(x):

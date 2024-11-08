@@ -16,10 +16,10 @@ class Params:
                  SIM_DIR="MY_SIM",     ## File name
                  FILE_INT=0.1*YEAR,     ## Increment between different files (doesn't really matter)
                  RESTART=False,         ## Whether or not to restart, not really that useful
-                 CFLDT = 0.7,           ## CFL number
-                 SDT = 0.1,             ## Source number, kind of like CFL number for sources
+                 CFLDT = 0.5,           ## CFL number
+                 SDT = 0.5,             ## Source number, kind of like CFL number for sources
                  BE_CRIT=-0.1,          ## Wind parameter
-                 DBE=1/300,             ## Wind parameter
+                 DBE=1/60,             ## Wind parameter
                  FWIND=0.5,             ## Wind parameter
                  SIGMAF = 2,              ## Fallback parameter
                  FSH=0.5,               ## Fallback parameter

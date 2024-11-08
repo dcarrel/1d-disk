@@ -120,6 +120,10 @@ class Simulation:
             self.vhalf.update_variables(sigma_half, ts_half, t=self.t+self.dt/2)
 
             vf_half = np.copy(self.vhalf.vr)
+            cfl_arr_half = self.params.CFLDT*np.abs(np.where(vf_half<0, dr_left, dr_right)/(vf_half+1e-50))
+            cfl_half_cond = True if np.min(cfl_arr_half) > self.dt else False
+                
+            
             sigma.D = self.vhalf.sigma_dot
             ts.D = self.vhalf.ts_dot
 
@@ -162,7 +166,7 @@ class Simulation:
             neg_condition = np.any(ts_full < sigma_full*self.params.ENTROPY_ATOL) \
                                  or np.any(sigma_full < self.params.SIGMA_FLOOR)
 
-            if (err_condition or inv_condition) or neg_condition:
+            if (err_condition or inv_condition) or (neg_condition or cfl_half_cond):
                 self.dt *= 0.9
                 n += 1
                 bk=True
@@ -332,7 +336,8 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True, sigma
     var_tild[-1] = var_tild[-2]
     ## flux correction
     sign_face = np.sign(var_tild[1:] - var_tild[:-1])
-    fad_face = mu_face*vol_face*(var_T[1:] - var_T[:-1])
+#fad_face = mu_face*vol_face*(var_T[1:] - var_T[:-1])
+    fad_face = mu_face*vol_face*(var_tild[1:] - var_tild[:-1])
 
     flux_face = var.grid.face_zeros()
     flux_left = sign_face[:-1]*var.grid.cell_vol[1:-1]*(var_tild[2:] - var_tild[1:-1])
