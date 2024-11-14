@@ -2,7 +2,16 @@ import numpy as np
 from grid import *
 from eos import *
 from opacity import *
+import time
 from scipy.special import gamma
+
+def minmod(a,b):
+    minmod_ret = np.zeros(a.shape)
+    cond1 = np.logical_and(np.abs(a) < np.abs(b), a*b > 0)
+    cond2 = np.logical_and(np.abs(a) > np.abs(b), a*b > 0)
+    minmod_ret[cond1] = a[cond1]
+    minmod_ret[cond2] = b[cond2]
+    return minmod_ret
 
 class ShastaVariable:
     def __init__(self, grid, data, vf, D):
@@ -51,7 +60,13 @@ class FullVariable:
         self.s[0] = self.s[1]
         self.s[-1] = self.s[-2]
 
-        self.s[self.s<self.params.ENTROPY_ATOL] = self.params.ENTROPY_ATOL
+        below_entropy_floor = self.s <= ENTROPY_FLOOR
+        above_entropy_ceil = self.s >=ENTROPY_CEIL
+
+        use_interpolation_table = np.logical_and(
+            np.logical_not(below_entropy_floor),
+            np.logical_not(above_entropy_ceil)
+        )
 
         #self.s = np.where(self.s<ENTROPY_MIN, ENTROPY_MIN, self.s)
         self.sigma[below_floor] = self.params.SIGMA_FLOOR
@@ -60,8 +75,16 @@ class FullVariable:
         self.ts = self.s*self.sigma
         self.t = t
         self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
-        
-        self.T = self.eos(self.chi, self.s)
+
+        self.T = self.grid.cell_ones()
+
+        if np.any(above_entropy_ceil):
+            self.T[above_entropy_ceil] = rad_temp(self.chi[above_entropy_ceil], self.s[above_entropy_ceil])
+        if np.any(below_entropy_floor):
+            self.T[below_entropy_floor] = ENTROPY_FLOOR
+        if np.any(use_interpolation_table):
+            self.T[use_interpolation_table] = self.eos(self.chi[use_interpolation_table], self.s[use_interpolation_table])
+
 
         self.rho = entropy_difference(self.T, self.chi, self.s, just_density=True)
         self.U = RADA*self.T**4 + 1.5*self.rho*KB*self.T/mu
@@ -95,11 +118,25 @@ class FullVariable:
 
 
         ## defined at the cell centers
+        LIMIT_SLOPE = True
+        self.vr = self.grid.face_zeros()
+        if LIMIT_SLOPE:
+            vro = -d_tild[1:-1]*g_tild[1:-1]/lc_sigma_tild[1:-1]/self.grid.ddr[1:-1]
+            f_cell = lc_sigma/g
+            f_face = lc_sigma_tild/g_tild
 
-        self.vr = -d_tild * g_tild / lc_sigma_tild * (lc_sigma[1:] / g[1:] - lc_sigma[:-1] / g[:-1])/self.grid.ddr
+            right_approx = vro*(-3*f_face[1:-1] + 4*f_cell[2:-1] - f_face[2:])
+            left_approx = vro*(3*f_face[1:-1] - 4*f_cell[1:-2] + f_face[:-2])
+            center_approx = vro*(f_cell[2:-1] - f_cell[1:-2])
+            self.vr[1:-1] = minmod(minmod(left_approx, right_approx), center_approx)
+
+        else:
+            self.vr[1:-1] = -d_tild[1:-1] * g_tild[1:-1] / lc_sigma_tild[1:-1] * (lc_sigma[2:-1] / g[2:-1] - lc_sigma[1:-2] / g[1:-2])/self.grid.ddr[1:-1]
+        self.vr[0] = np.minimum(0, self.vr[1]*self.grid.r_face[1]/self.grid.r_face[0]) ## outflow boundary condition, allegedly
+        self.vr[-1] = np.maximum(0, self.vr[-2]*self.grid.r_face[-2]/self.grid.r_face[-1])
+
         #self.vr[0] = np.minimum(0, self.vr[0])
         #self.vr[-1] = np.maximum(0, self.vr[-1])
-        #self.vr[0] = self.vr[1]
 
 
         ## calculate source terms for density
@@ -109,12 +146,12 @@ class FullVariable:
         ## uses angular momentum distribution instead
 
 
-        sigma_fb= self.mass_distribution * self.params.MDOT(self.t)
+        sigma_fb = self.mass_distribution * self.params.MDOT(self.t)
         if not self.params.FB_ON: sigma_fb *= 0
-
         self.sigma_dot = sigma_fb - sigma_wl
 
         # calculate source terms for entropy
+
         kappa = kappa_interpolator(self.rho, self.T)
         self.qrad = 4*RADA*self.T**4*c/(1+kappa*self.sigma)  # radiative cooling
         self.qwind = self.params.FWIND*self.grid.omgko*self.sigv*self.sigma*self.grid.vk2o  # wind cooling

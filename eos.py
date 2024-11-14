@@ -8,7 +8,7 @@ XH   = 0.7
 XHe  = 0.3
 mu   = XH*MP + 4*XHe*MP
 ## hydrogen, electron fraction, helium fraction
-Xi = np.array([XH, XH+4*XHe, XHe])
+Xi = np.array([XH, XH+2*XHe, XHe])
 mi = np.array([MP, ME, 4*MP])
 Xi_over_mi = Xi/mi
 
@@ -23,15 +23,15 @@ def rad_dens(chi, entropy, temp):
 
 ## returns temperature, density
 def gas_temp(chi, entropy):
-    Bi = np.log((2 * np.pi * mi * KB / HP / HP) ** 1.5 * mi / Xi)
-    kappa = entropy - np.sum(Xi * KB / mi * (5 / 2 + Bi))
-    kappa /= np.sum(Xi * KB / mi)
-
-    temp = np.sqrt(0.5 * chi * np.sqrt(mu / KB) * np.exp(kappa))
-
+    Ai = Xi*KB/mu
+    Bi = np.einsum("i,jk->ijk", 2/Xi*np.sqrt(KB*mu)*(2*np.pi*mi*KB/HP/HP)**1.5, 1/chi)
+    Bi = np.log(Bi)
+    A = np.sum(Ai)
+    AB = np.einsum("i, ijk->jk", Ai, 2.5 + Bi)
+    temp = np.exp(0.5*A**-1*(entropy - AB))
     return temp
 
-def gas_dens(chi, entropy, temp,):
+def gas_dens(chi, entropy, temp):
     dens = chi / 2 * np.sqrt(mu / KB / temp)
     return dens
 
@@ -39,15 +39,15 @@ def gas_dens(chi, entropy, temp,):
 def entropy_difference(temp, chi, entropy=None, just_density=False, temp_log=False, just_estimate=False):
     if temp_log:
         temp = np.power(10, temp)
-    Bi = (2 * np.pi * mi * KB / HP ** 2) ** 1.5 * mi / Xi
 
     rho = get_density(chi, temp)
-
     if just_density: return rho
+
+    Bi = (2*np.pi*mi*KB/HP/HP) ** 1.5 * mu/Xi
 
     entropy_estimate = 4 * RADA * temp ** 3 / 3 / rho
     for i, m in enumerate(mi):
-        entropy_estimate += Xi[i] * KB / mi[i] * (2.5 + np.log(Bi[i] * temp**1.5/ rho))
+        entropy_estimate += Xi[i] * KB / mu * (2.5 + np.log(Bi[i] * temp**1.5/ rho))
 
     if just_estimate: return entropy_estimate
 
@@ -110,7 +110,7 @@ def full_temp(chi, entropy, xtol=1e-6, temp_guess=None):
     if temp_guess is None:
         temp_guess = rad_temp(chi, entropy)
     temp_guess = better_temperature_guess(temp_guess, chi, entropy)
-    temp = fsolve(entropy_difference, temp_guess, args=(chi, entropy, False, False), xtol=xtol)
+    temp = fsolve(entropy_difference, temp_guess, args=(chi, entropy, False, False, False), xtol=xtol)
     # dens = entropy_difference(temp, chi, entropy, just_density=True)
     return temp
 
@@ -138,23 +138,23 @@ def load_table(table_name, retvars=False):
     log_temperature = df.to_numpy()
     interpolator = RectBivariateSpline(log_chi, log_entropy, log_temperature.T)
 
-    ## stuff outside the domain
-    chi_p_slopes = log_temperature[:, -1] - log_temperature[:, -2]
-    chi_p_slopes /= log_chi[-1] - log_chi[-2]
+    # stuff outside the domain
+    #chi_p_slopes = log_temperature[:, -1] - log_temperature[:, -2]
+    #chi_p_slopes /= log_chi[-1] - log_chi[-2]
 
     chi_m_slopes = log_temperature[:, 1] - log_temperature[:, 0]
     chi_m_slopes /= log_chi[1] - log_chi[0]
 
-    entropy_p_slopes = log_temperature[-1] - log_temperature[-2]
-    entropy_p_slopes /= log_entropy[-1] - log_entropy[-2]
-    entropy_m_slopes = log_temperature[1] - log_temperature[0]
-    entropy_m_slopes /= log_entropy[1] - log_entropy[0]
+    #entropy_p_slopes = log_temperature[-1] - log_temperature[-2]
+    #entropy_p_slopes /= log_entropy[-1] - log_entropy[-2]
+    #entropy_m_slopes = log_temperature[1] - log_temperature[0]
+    #entropy_m_slopes /= log_entropy[1] - log_entropy[0]
 
-    chi_p = log_chi[-1]
+    #chi_p = log_chi[-1]
     chi_m = log_chi[0]
 
-    entropy_p = log_entropy[-1]
-    entropy_m = log_entropy[0]
+    #entropy_p = log_entropy[-1]
+    #entropy_m = log_entropy[0]
 
     def EOS(chi, entropy):
         ulog_chi = np.log10(chi)
@@ -162,10 +162,10 @@ def load_table(table_name, retvars=False):
         values = interpolator(ulog_chi, ulog_entropy, grid=False)
 
         ## interpolation outside of boundaries
-        values += np.maximum(ulog_chi - chi_p, 0) * np.interp(ulog_entropy, log_entropy, chi_p_slopes)
+        #values += np.maximum(ulog_chi - chi_p, 0) * np.interp(ulog_entropy, log_entropy, chi_p_slopes)
         values += np.minimum(ulog_chi - chi_m, 0) * np.interp(ulog_entropy, log_entropy, chi_m_slopes)
-        values += np.maximum(ulog_entropy - entropy_p, 0) * np.interp(ulog_chi, log_chi, entropy_p_slopes)
-        values += np.minimum(ulog_entropy - entropy_m, 0) * np.interp(ulog_chi, log_chi, entropy_m_slopes)
+        #values += np.maximum(ulog_entropy - entropy_p, 0) * np.interp(ulog_chi, log_chi, entropy_p_slopes)
+        #values += np.minimum(ulog_entropy - entropy_m, 0) * np.interp(ulog_chi, log_chi, entropy_m_slopes)
 
         return np.power(10, values)
 

@@ -58,11 +58,14 @@ class Simulation:
 
     def take_step(self):
         dr = []
+        dr_left = []
+        dr_right = []
         if self.params.GEOMETRY.__eq__("LOGARITHMIC"):
             dr_left = self.grid.r_face - self.grid.r_cell[:-1]
             dr_left[0] = np.inf ## used for calculating cfl
             dr_right = self.grid.r_cell[1:] - self.grid.r_face
-            dr = np.where(self.var0.vr < 0, dr_left, dr_right)
+            dr_right[-1] = np.inf
+            dr = np.where(self.var0.vr < 0, dr_left, dr_right) ## cfl dr
         elif self.params.GEOMETRY.__eq__("LINEAR"):
             dr = self.grid.dr / 2
 
@@ -113,6 +116,7 @@ class Simulation:
                                                                      dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
 
             ts_half, sigma_half = ts.data, sigma.data
+
             if self.params.EVOLVE_ENTROPY: ts_half = shasta_step(ts, vr, self.dt/2, interp=self.params.INTERP,
                                                                  dirichlet_left=False, sigma_floor=self.params.SIGMA_FLOOR)
             if self.params.EVOLVE_SIGMA: sigma_half = shasta_step(sigma, vr, self.dt/2, interp=self.params.INTERP,
@@ -121,11 +125,20 @@ class Simulation:
 
             vf_half = np.copy(self.vhalf.vr)
             cfl_arr_half = self.params.CFLDT*np.abs(np.where(vf_half<0, dr_left, dr_right)/(vf_half+1e-50))
-            cfl_half_cond = True if np.min(cfl_arr_half) > self.dt else False
-                
+            cfl_half_cond = True if np.min(cfl_arr_half) < self.dt else False
+            cfl_half_cond = False
+
             
             sigma.D = self.vhalf.sigma_dot
             ts.D = self.vhalf.ts_dot
+
+            #ts_arr_half = (self.params.SDT * self.var0.ts / (self.var0.ts_dot + 1e-50))[1:-1]
+            #if not self.params.EVOLVE_ENTROPY: ts_dt = np.inf
+            #sigma_arr_half = (self.params.SDT * self.var0.sigma / (self.var0.sigma_dot + 1e-50))[1:-1]
+            #sigma_arr = np.where(sigma_arr > 0, np.inf, -sigma_arr)
+            #sigma_loc = np.argmin(sigma_arr)
+            #sigma_dt = sigma_arr[sigma_loc]
+            #if not self.params.EVOLVE_SIGMA: sigma_dt = np.inf
 
             ts_full, sigma_full = ts.data, sigma.data
             if self.params.EVOLVE_ENTROPY: ts_full = shasta_step(ts, vf_half, self.dt, interp=self.params.INTERP,
@@ -166,10 +179,10 @@ class Simulation:
             neg_condition = np.any(ts_full < sigma_full*self.params.ENTROPY_ATOL) \
                                  or np.any(sigma_full < self.params.SIGMA_FLOOR)
 
-            if (err_condition or inv_condition) or (neg_condition or cfl_half_cond):
+            if (err_condition or inv_condition) or (cfl_half_cond):
                 self.dt *= 0.9
                 n += 1
-                bk=True
+                bk = True
             elif n > self.params.MAXIT:
                 if self.progress_message is None and self.verbose:
                     print(f"Could not converge to desired tolerances in {self.params.MAXIT} iterations")
@@ -185,7 +198,7 @@ class Simulation:
                     loc = [min_ts_loc, min_sigma_loc][which_to_use]
                 break
 
-        save_dt = np.maximum(np.inf if not self.params.EVOLVE_SIGMA else 0, np.min(self.tsave)-self.t)
+        save_dt = np.maximum(np.inf if self.params.IC else 0, np.min(self.tsave)-self.t)
         self.t += np.minimum(np.minimum(self.dt, self.params.TF-self.t), save_dt)
         self.var0.update_variables(sigma_full, ts_full, t=self.t)
         ## returns timestep, reason for minimum timestep, location, sigma_error, ts_error
@@ -337,7 +350,7 @@ def shasta_step(var, vf, dt, interp="LINEAR", diff=1, dirichlet_left=True, sigma
     ## flux correction
     sign_face = np.sign(var_tild[1:] - var_tild[:-1])
 #fad_face = mu_face*vol_face*(var_T[1:] - var_T[:-1])
-    fad_face = mu_face*vol_face*(var_tild[1:] - var_tild[:-1])
+    fad_face = mu_face*vol_face*(var_T[1:] - var_T[:-1])
 
     flux_face = var.grid.face_zeros()
     flux_left = sign_face[:-1]*var.grid.cell_vol[1:-1]*(var_tild[2:] - var_tild[1:-1])

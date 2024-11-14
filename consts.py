@@ -15,6 +15,8 @@ MONTH = 30*DAY
 YEAR = 365*DAY
 HOUR = DAY/24
 
+ENTROPY_FLOOR = 1e9 ## entropy where classical approximation begins to break down
+ENTROPY_CEIL = 1e11 ## where radiation dominates and can use radiation EOS instead of interpolating
 
 def arr_to_string(array, t=None):
     str = f"{array[0]:5.5e}"

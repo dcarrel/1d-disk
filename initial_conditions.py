@@ -20,7 +20,7 @@ def analytic_solution(M0, R0, TVISC):
     return func
 
 class InitialCondition:
-    def __init__(self, m0=0.005, eff=1.1, params=Params(), tf=1*MONTH, load_from=None,
+    def __init__(self, m0=0.01, eff=1.1, params=Params(), tf=1*MONTH, load_from=None,
                  save_dir=None, verbose=True, evolve=True, progress_message=None, sigfloor=1e-2):
         self.load_from = load_from
         self.params=params
@@ -65,9 +65,10 @@ class InitialCondition:
 
             mass_distribution = mass_distribution(self.grid.r_cell, eff)*m0
 
-            self.sigma0 = mass_distribution + sigfloor
-            rmax = self.grid.r_cell[np.argmax(self.sigma0)]
-            self.sigma0[self.grid.r_cell <= rmax] = np.max(self.sigma0)
+            self.sigma0 = sigfloor*self.grid.cell_ones()
+            region = self.grid.r_cell >= 2*params.RC
+            self.sigma0[region] = sigfloor*(self.grid.r_cell[region]/2/params.RC)**-2
+
             self.params=params
             self.eos = load_table(self.params.EOS_TABLE)
 
@@ -79,11 +80,12 @@ class InitialCondition:
 
             temperature = get_temperature_from_density(1000*self.grid.cell_ones(), chi0, density0)
             self.entropy0 = entropy_difference(temperature, chi0, None, just_estimate=True)
-            self.entropy0 = 1e12*self.grid.cell_ones()
+            self.entropy0 = 2e9*self.grid.cell_ones()
 
 
             ic_pdict = self.params._pdict.copy()
-            ic_pdict["EVOLVE_SIGMA"] = False
+            ic_pdict["EVOLVE_SIGMA"] = True
+            ic_pdict["IC"] = True
             ic_pdict["FB_ON"] = False
             ic_pdict["SAVE"] = False
             ic_pdict["TF"] = tf

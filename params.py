@@ -17,9 +17,9 @@ class Params:
                  FILE_INT=0.1*YEAR,     ## Increment between different files (doesn't really matter)
                  RESTART=False,         ## Whether or not to restart, not really that useful
                  CFLDT = 0.5,           ## CFL number
-                 SDT = 0.5,             ## Source number, kind of like CFL number for sources
+                 SDT = 0.1,             ## Source number, kind of like CFL number for sources
                  BE_CRIT=-0.1,          ## Wind parameter
-                 DBE=1/60,             ## Wind parameter
+                 DBE=1/100,             ## Wind parameter
                  FWIND=0.5,             ## Wind parameter
                  SIGMAF = 2,              ## Fallback parameter
                  FSH=0.5,               ## Fallback parameter
@@ -34,6 +34,7 @@ class Params:
                  MSTAR = MSUN,            ## Stellar mass
                  MAGE = 0.5,               ## like a wizard but more mystical
                  BETA = 1,                 ## tidal disruption parameter RT/RP
+                 IC=False,
 
                  INTERP="LINEAR",       ## How to interpolate from cells onto faces
                  ## Options: LINEAR: interpolates linearly on r_cell, LOGARITHMIC: interpolates linearly on log r_cell
@@ -71,6 +72,7 @@ class Params:
                            "BE_CRIT": float(BE_CRIT),
                            "DBE": float(DBE),
                            "FWIND": float(FWIND),
+                            "IC" : IC,
                            "SIGMAF": float(SIGMAF),
                            "FSH": float(FSH),
                            "ALPHA":float(ALPHA),
@@ -132,6 +134,7 @@ class Params:
         self.BE_CRIT = self._pdict["BE_CRIT"]
         self.DBE = self._pdict["DBE"]
         self.FWIND = self._pdict["FWIND"]
+        self.IC = self._pdict["IC"]
 
         self.SIGMAF = self._pdict["SIGMAF"]
         self.FSH = self._pdict["FSH"]
@@ -195,7 +198,9 @@ class Params:
 
         self.CAPTURE=True if self.RT < self.RSCH else False
         self.R0 = 3*self.RSCH
-        self.RF = 500*self.RT
+
+        A_FID = (45*HOUR/2/np.pi)**(2/3)*(CONST_G*self.MBH)**(1/3)
+        self.RF = 10*A_FID
 
 
         if PRINT and not self.FALLBACK_FAILURE:
