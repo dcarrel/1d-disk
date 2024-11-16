@@ -3,7 +3,7 @@ from consts import *
 import json, os, sys
 sys.path.append(os.path.abspath(os.getcwd()))
 from STARS_library.SL_run import *
-
+from scipy.optimize import fsolve
 class Params:
     def __init__(self,
                  MBH=1e6*MSUN,          ## BH mass
@@ -197,10 +197,10 @@ class Params:
             self.A_SD = self.TOTAL_FALLBACK_MASS/self.A_ORB**2
 
         self.CAPTURE=True if self.RT < self.RSCH else False
-        self.R0 = 3*self.RSCH
+        self.R0 = 2*self.RSCH
 
         A_FID = (45*HOUR/2/np.pi)**(2/3)*(CONST_G*self.MBH)**(1/3)
-        self.RF = 10*A_FID
+        self.RF = 5*A_FID
 
 
         if PRINT and not self.FALLBACK_FAILURE:
@@ -211,6 +211,35 @@ class Params:
         self.RMB = 2*self.RSCH
         self.LMIN = np.sqrt(CONST_G * self.MBH * self.RMB ** 2 / (self.RMB - self.RSCH))
         self.LC = np.sqrt(CONST_G * self.MBH * self.RC ** 2 / (self.RC - self.RSCH))
+
+        def am_distribution(x, f):
+            mu = np.log(self.LC / f - self.LMIN)
+            sigma2 = 2 * np.log((self.LC - self.LMIN) / (self.LC / f - self.LMIN))
+            return 1 / (x - self.LMIN) / np.sqrt(sigma2 * 2 * np.pi) * np.exp(
+                -(np.log(x - self.LMIN) - mu) ** 2 / 2 / sigma2)
+
+        def spec_ang(x):
+            return np.sqrt(CONST_G * self.MBH * x ** 2 / (x - self.RSCH))
+
+        def dl_dr(x):
+            return np.sqrt(CONST_G * self.MBH / (x - self.RSCH)) - 0.5 * x * np.sqrt(
+                CONST_G * self.MBH / (x - self.RSCH) ** 3)
+        def mass_distribution(x, f):
+            am_x = spec_ang(x)
+            am_dist = am_distribution(am_x, f)
+            result = am_dist * dl_dr(x) / 2 / np.pi / x
+            result = np.where(np.logical_or(np.isnan(result), np.isinf(result)), 0, result)
+            result = np.where(result < 0, 0, result)
+            return result
+
+        def sigmaf_func(f, rmed):
+            fake_grid = np.logspace(np.log10(self.R0), np.log10(self.RF), 200)
+            sigma_dist = mass_distribution(fake_grid, f)
+            mass_dist = 2 * np.pi * fake_grid * sigma_dist
+            peak_loc = fake_grid[np.argmax(mass_dist)]
+            return peak_loc - rmed
+
+        self.SIGMAF = fsolve(sigmaf_func, 1.1, args=(self.RC), xtol=1e-3, epsfcn=1e-5)[0]
 
 
 
