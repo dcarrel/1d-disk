@@ -33,10 +33,10 @@ class FullVariable:
             return 1 / (x - self.params.LMIN) / np.sqrt(sigma2 * 2 * np.pi) * np.exp(-(np.log(x - self.params.LMIN) - mu) ** 2 / 2 / sigma2)
 
         def spec_ang(x):
-            return np.sqrt(CONST_G * self.params.MBH * x ** 2 / (x - self.params.RSCH))
+            return np.sqrt(CONST_G * self.params.MBH * x ** 3 / (x - self.params.RSCH)**2)
 
         def dl_dr(x):
-            return np.sqrt(CONST_G * self.params.MBH / (x - self.params.RSCH)) - 0.5 * x * np.sqrt(CONST_G * self.params.MBH / (x - self.params.RSCH) ** 3)
+            return spec_ang(x)*(1.5/x - 1/(x-self.params.RSCH))
 
         def mass_distribution(x, f):
             am_x = spec_ang(x)
@@ -62,27 +62,21 @@ class FullVariable:
 
         below_entropy_floor = self.s <= ENTROPY_FLOOR
         above_entropy_ceil = self.s >=ENTROPY_CEIL
+        self.s[below_entropy_floor] = ENTROPY_FLOOR
 
-        use_interpolation_table = np.logical_and(
-            np.logical_not(below_entropy_floor),
-            np.logical_not(above_entropy_ceil)
-        )
-
+        use_interpolation_table = np.logical_not(above_entropy_ceil)
         #self.s = np.where(self.s<ENTROPY_MIN, ENTROPY_MIN, self.s)
         self.sigma[below_floor] = self.params.SIGMA_FLOOR
         self.sigma[0] = self.sigma[1]
         self.sigma[-1] = self.sigma[-2]
         self.ts = self.s*self.sigma
         self.t = t
-        self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
-
+        self.chi = self.sigma*self.grid.omgko
         self.T = self.grid.cell_ones()
 
 
         if np.any(above_entropy_ceil):
             self.T[above_entropy_ceil] = rad_temp(self.chi[above_entropy_ceil], self.s[above_entropy_ceil])
-        if np.any(below_entropy_floor):
-            self.T[below_entropy_floor] = ENTROPY_FLOOR
         if np.any(use_interpolation_table):
             self.T[use_interpolation_table] = self.eos(self.chi[use_interpolation_table], self.s[use_interpolation_table])
 

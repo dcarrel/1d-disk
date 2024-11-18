@@ -33,7 +33,7 @@ class Grid:
             self.dr = dr
             self.ddr = dr # for calculating cell-centered derivatives
 
-        self.omgko = np.sqrt(CONST_G*params.MBH/(self.r_cell-self.params.RSCH)**3)
+        self.omgko = np.sqrt(CONST_G*params.MBH/(self.r_cell-self.params.RSCH)**2/self.r_cell)
         self.vk2o = self.r_cell**2*self.omgko**2
 
 

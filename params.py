@@ -16,7 +16,7 @@ class Params:
                  SIM_DIR="MY_SIM",     ## File name
                  FILE_INT=0.1*YEAR,     ## Increment between different files (doesn't really matter)
                  RESTART=False,         ## Whether or not to restart, not really that useful
-                 CFLDT = 0.5,           ## CFL number
+                 CFLDT = 0.7,           ## CFL number
                  SDT = 0.1,             ## Source number, kind of like CFL number for sources
                  BE_CRIT=-0.1,          ## Wind parameter
                  DBE=1/100,             ## Wind parameter
@@ -208,8 +208,12 @@ class Params:
 
         self.RC = 2*self.RP
         self.RMB = 2*self.RSCH
-        self.LMIN = np.sqrt(CONST_G * self.MBH * self.RMB ** 2 / (self.RMB - self.RSCH))
-        self.LC = np.sqrt(CONST_G * self.MBH * self.RC ** 2 / (self.RC - self.RSCH))
+
+        def spec_ang(x):
+            return np.sqrt(CONST_G * self.MBH * x ** 3 / (x - self.RSCH)**2)
+
+        self.LMIN = spec_ang(3*self.RSCH)
+        self.LC = spec_ang(self.RC)
 
         def am_distribution(x, f):
             mu = np.log(self.LC / f - self.LMIN)
@@ -217,12 +221,8 @@ class Params:
             return 1 / (x - self.LMIN) / np.sqrt(sigma2 * 2 * np.pi) * np.exp(
                 -(np.log(x - self.LMIN) - mu) ** 2 / 2 / sigma2)
 
-        def spec_ang(x):
-            return np.sqrt(CONST_G * self.MBH * x ** 2 / (x - self.RSCH))
-
         def dl_dr(x):
-            return np.sqrt(CONST_G * self.MBH / (x - self.RSCH)) - 0.5 * x * np.sqrt(
-                CONST_G * self.MBH / (x - self.RSCH) ** 3)
+            return spec_ang(x)*(1.5/x - 1/(x-self.RSCH))
         def mass_distribution(x, f):
             am_x = spec_ang(x)
             am_dist = am_distribution(am_x, f)
@@ -238,9 +238,8 @@ class Params:
             peak_loc = fake_grid[np.argmax(mass_dist)]
             return peak_loc - rmed
 
-        sigmaf_sol = fsolve(sigmaf_func, 1.5, args=(self.SIGMAF*self.RC), xtol=1e-3, epsfcn=1e-6,
+        sigmaf_sol = fsolve(sigmaf_func, 1.05, args=(self.SIGMAF*self.RC), xtol=1e-3, epsfcn=1e-4,
                             full_output=True)
-        print(sigmaf_sol)
         if sigmaf_sol[2]:
             self.SIGMAF = sigmaf_sol[0][0]
         else:
