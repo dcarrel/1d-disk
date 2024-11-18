@@ -21,7 +21,7 @@ class Params:
                  BE_CRIT=-0.1,          ## Wind parameter
                  DBE=1/100,             ## Wind parameter
                  FWIND=0.5,             ## Wind parameter
-                 SIGMAF = 2,              ## Fallback parameter
+                 SIGMAF = 1,              ## Fallback parameter
                  FSH=0.5,               ## Fallback parameter
                  ALPHA=0.01,            ## Viscosity parameter
                  TOL=1e-3,              ## Numerical tolerance, approximated by RK1/2 difference
@@ -46,7 +46,6 @@ class Params:
                  SAVE=True,
                  MAXTIME=None, ## cancels after a certain amount of time
                  PRINT=False,
-
                  M0=0.01,
                  TV0=0.05,
                  SIGMA_FLOOR=0
@@ -197,7 +196,7 @@ class Params:
             self.A_SD = self.TOTAL_FALLBACK_MASS/self.A_ORB**2
 
         self.CAPTURE=True if self.RT < self.RSCH else False
-        self.R0 = 2*self.RSCH
+        self.R0 = 3*self.RSCH
 
         A_FID = (45*HOUR/2/np.pi)**(2/3)*(CONST_G*self.MBH)**(1/3)
         self.RF = 5*A_FID
@@ -239,8 +238,14 @@ class Params:
             peak_loc = fake_grid[np.argmax(mass_dist)]
             return peak_loc - rmed
 
-        self.SIGMAF = fsolve(sigmaf_func, 1.1, args=(self.RC), xtol=1e-3, epsfcn=1e-5)[0]
-
+        sigmaf_sol = fsolve(sigmaf_func, 1.5, args=(self.SIGMAF*self.RC), xtol=1e-3, epsfcn=1e-6,
+                            full_output=True)
+        print(sigmaf_sol)
+        if sigmaf_sol[2]:
+            self.SIGMAF = sigmaf_sol[0][0]
+        else:
+            print("unable to set desired mass distribution")
+            self.SIGMAF = False
 
 
     def save(self, file_name=None):

@@ -78,6 +78,7 @@ class FullVariable:
 
         self.T = self.grid.cell_ones()
 
+
         if np.any(above_entropy_ceil):
             self.T[above_entropy_ceil] = rad_temp(self.chi[above_entropy_ceil], self.s[above_entropy_ceil])
         if np.any(below_entropy_floor):
@@ -105,6 +106,7 @@ class FullVariable:
         lc_sigma = 2 * np.pi * self.sigma * self.grid.r_cell
         g = np.sqrt(self.grid.r_cell) / (self.nu+1e-20)
         d = 3*self.nu
+
 
         lc_sigma_tild, g_tild, d_tild = [], [], []
         if self.params.INTERP.__eq__("LINEAR"):

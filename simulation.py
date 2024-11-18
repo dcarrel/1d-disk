@@ -56,7 +56,7 @@ class Simulation:
 
         self.vhalf = FullVariable(params)
 
-    def take_step(self):
+    def take_step(self, increase_timestep=False):
         dr = []
         dr_left = []
         dr_right = []
@@ -101,9 +101,8 @@ class Simulation:
         n, ts_full, sigma_full, max_sigma_err, max_ts_err = 0, [], [], np.inf, np.inf
         vr = np.copy(self.var0.vr)
 
-        self.dt /= 0.9
 
-        bk=False
+        bk, increase_timestep=False, False
 
         while True: ## adaptive timestepping based on RK12
             sigma = self.var0.sigma_var()
@@ -170,9 +169,9 @@ class Simulation:
             max_sigma_err = np.max(sigma_rel_err)
             max_ts_err = np.max(ts_rel_err)
 
-
             ## which error is larger
             which_to_use = 0 if np.any(ts_err < 0) else 1
+            increase_timestep = True if np.logical_and(max_sigma_err < 0.5*self.params.TOL, max_ts_err < 0.5*self.params.TOL) else False
 
             err_condition = np.any(ts_err < 0) or np.any(sigma_err < 0)
             inv_condition = is_invalid(ts_full) or is_invalid(sigma_full)
@@ -198,11 +197,12 @@ class Simulation:
                     loc = [min_ts_loc, min_sigma_loc][which_to_use]
                 break
 
+
         save_dt = np.maximum(np.inf if self.params.IC else 0, np.min(self.tsave)-self.t)
         self.t += np.minimum(np.minimum(self.dt, self.params.TF-self.t), save_dt)
         self.var0.update_variables(sigma_full, ts_full, t=self.t)
         ## returns timestep, reason for minimum timestep, location, sigma_error, ts_error
-        return self.dt, st, loc, max_sigma_err, max_ts_err
+        return self.dt, st, loc, max_sigma_err, max_ts_err, increase_timestep
     def evolve(self):
         sigmafile, sfile = None, None
         if self.params.SAVE:
@@ -213,7 +213,10 @@ class Simulation:
             old_sigma, old_entropy = [], []
 
             tst0 = time.process_time()
-            dt, st, loc, sig_err, ts_err = self.take_step()
+            increase_timestep = False
+            dt, st, loc, sig_err, ts_err, inc = self.take_step(increase_timestep)
+            increase_timestep = inc
+            if increase_timestep: self.dt /= 0.9
             dtts = time.process_time() - tst0
     
             new_sigma, new_entropy = [], []
@@ -264,7 +267,8 @@ class Simulation:
                     self.progress_message[6] = sig_err
                     self.progress_message[7] = ts_err
                 else:
-                    message = f"\rpct: {(self.t / self.params.TF * 100):2.2f}%\tdt={dt / (self.params.TF - self.t0):2.2e}\t{st}\tloc={loc:2.2f}"+f"\tsig {sig_err:2.2e}\tts {ts_err:2.2e}\t\t\t\t\t"
+                    message = (f"\rpct: {(self.t / self.params.TF * 100):2.2f}%\tdt={dt / (self.params.TF - self.t0):2.2e}"
+                               f"\t{st}\tloc={loc:2.2f}")+f"\tsig {sig_err:2.2e}\tts {ts_err:2.2e}\t rdt {dtts:2.2e}\t\t\t\t\t"
                     print(message, end="")
             if np.isnan(dt) or np.any(self.var0.ts<0): break
             if self.t >= self.params.TF: break
