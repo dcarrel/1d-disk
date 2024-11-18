@@ -240,7 +240,7 @@ class Params:
 
         sigmaf_sol = fsolve(sigmaf_func, 1.05, args=(self.SIGMAF*self.RC), xtol=1e-3, epsfcn=1e-4,
                             full_output=True)
-        if sigmaf_sol[2]:
+        if sigmaf_sol[2] == 1:
             self.SIGMAF = sigmaf_sol[0][0]
         else:
             print("unable to set desired mass distribution")
