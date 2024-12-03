@@ -6,7 +6,7 @@ from params import *
 
 ## Initial conditions are a surface density and an entropy per unit mass
 class Simulation:
-    def __init__(self, sigma0, entropy0, params=Params(), verbose=True, progress_message=None):
+    def __init__(self, sigma0=None, entropy0=None, params=Params(), verbose=True, progress_message=None):
         self.verbose = verbose
         ## sets up simulation directory
         if not os.path.isdir(params.SIM_DIR):
@@ -20,14 +20,31 @@ class Simulation:
         self.progress_message=progress_message
 
         if self.params.RESTART and self.params.SAVE:
-            sigma0 = np.load(self.sim_dir+"/sigma.npy", mmap_mode="r")[-1]
-            entropy0 = np.load(self.sim_dir+"/entropy.npy", mmap_mode="r")[-1]
-            r_cell = np.load(self.sim_dir+"/rocell.npy", mmap_mode="r")
-            self.grid = Grid(grid_array=r_cell)
-            tarr = np.load(self.sim_dir+"/tsave.npy", mmap_mode="r")
-            self.t0, self.t = tarr[0], tarr[-1]
-            self.file_start = np.arange(self.t, self.params.TF, self.params.FILE_INT)
-            self.file_start[0] = 3*self.params.TF
+            ### this is kind of old and the first if part I think is not great
+            if os.path.exists(os.path.join(self.sim_dir+"sigma.npy")):
+                sigma0 = np.load(os.path.join(self.sim_dir,"sigma.npy"), mmap_mode="r")[-1]
+                entropy0 = np.load(os.path.join(self.sim_dir, "entropy.npy"), mmap_mode="r")[-1]
+                r_cell = np.load(os.path.join(self.sim_dir,"rocell.npy"), mmap_mode="r")
+                self.grid = Grid(grid_array=r_cell)
+                tarr = np.load(os.path.join(self.sim_dir,"tsave.npy"), mmap_mode="r")
+            else: ## load from data files
+                sigma_files = sorted(glob.glob(os.path.join(self.sim_dir, "sigma.*.dat")))
+                entropy_files = sorted(glob.glob(os.path.join(self.sim_dir, "entropy.*.dat")))
+                if len(sigma_files) != len(entropy_files):
+                    raise Exception("number of saved surface density files not the same as saved entropy files")
+                ## checks to see if last data files has saved data
+                sigma2use = sigma_files[-1]
+                entropy2use = entropy_files[-1]
+
+                sigma0 = np.loadtxt(sigma2use, skiprows=1)[-1, 1:]
+                entropy0 = np.loadtxt(entropy2use, skiprows=1)[-1, 1:]
+                self.grid = Grid(params=self.params)
+                self.t0 = self.params.T0
+                self.t = np.loadtxt(sigma2use, skiprows=1)[-1, 0]
+
+                
+            self.file_start = np.arange(self.t0, self.params.TF, self.params.FILE_INT)
+            self.file_start[self.file_start < self.t] = 3*self.params.TF
         else:
             self.grid = Grid(params=params)
             self.t0 = params.T0
@@ -52,7 +69,7 @@ class Simulation:
         self.tsave = np.append(np.arange(self.t, self.params.TF, params.TS), [self.params.TF])
         self.tsave[0] = 3*self.params.TF  ## Initial data is already saved, this makes sure that it is not saved again I guess
         self.var0 = FullVariable(params)
-        self.var0.update_variables(sigma0, entropy0*sigma0, self.t0)
+        self.var0.update_variables(sigma0, entropy0*sigma0, self.t)
 
         self.vhalf = FullVariable(params)
 
@@ -225,6 +242,8 @@ class Simulation:
             cond = self.tsave - self.t <= 0 ## checks if simulation needs to save
             condf = self.file_start - self.t <= 0 ## checks if at the end of a file
 
+
+            ## SETS UP NEW FILE
             if np.any(condf) and self.params.SAVE:
                 sigmafile.close()
                 sfile.close()

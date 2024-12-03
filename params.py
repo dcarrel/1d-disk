@@ -198,7 +198,7 @@ class Params:
         self.CAPTURE=True if self.RT < self.RSCH else False
         self.R0 = 3*self.RSCH
 
-        A_FID = (45*HOUR/2/np.pi)**(2/3)*(CONST_G*self.MBH)**(1/3)
+        A_FID = (90*HOUR/2/np.pi)**(2/3)*(CONST_G*self.MBH)**(1/3)
         self.RF = 5*A_FID
 
 
@@ -232,13 +232,13 @@ class Params:
             return result
 
         def sigmaf_func(f, rmed):
-            fake_grid = np.logspace(np.log10(self.R0), np.log10(self.RF), 200)
+            fake_grid = np.logspace(np.log10(self.R0), np.log10(self.RF), 1000)
             sigma_dist = mass_distribution(fake_grid, f)
             mass_dist = 2 * np.pi * fake_grid * sigma_dist
             peak_loc = fake_grid[np.argmax(mass_dist)]
             return peak_loc - rmed
 
-        sigmaf_sol = fsolve(sigmaf_func, 1.05, args=(self.SIGMAF*self.RC), xtol=1e-3, epsfcn=1e-4,
+        sigmaf_sol = fsolve(sigmaf_func, 1.005, args=(self.SIGMAF*self.RC), xtol=1e-3, epsfcn=1e-6,
                             full_output=True)
         if sigmaf_sol[2] == 1:
             self.SIGMAF = sigmaf_sol[0][0]
