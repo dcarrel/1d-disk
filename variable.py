@@ -46,7 +46,7 @@ class FullVariable:
             result = np.where(result < 0, 0, result)
             return result
 
-        self.mass_distribution = mass_distribution(self.grid.r_cell, self.params.SIGMAF)
+        self.mass_distribution = mass_distribution(self.grid.r_cell, self.params.SIGMAF2U)
         cutoff = 1#np.maximum(1, np.exp(-(self.grid.r_cell/5/self.params.RC)**2))
         self.mass_distribution *= cutoff
 

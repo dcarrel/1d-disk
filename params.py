@@ -241,10 +241,10 @@ class Params:
         sigmaf_sol = fsolve(sigmaf_func, 1.005, args=(self.SIGMAF*self.RC), xtol=1e-3, epsfcn=1e-6,
                             full_output=True)
         if sigmaf_sol[2] == 1:
-            self.SIGMAF = sigmaf_sol[0][0]
+            self.SIGMAF2U = sigmaf_sol[0][0]
         else:
             print("unable to set desired mass distribution")
-            self.SIGMAF = False
+            self.SIGMAF2U = False
 
 
     def save(self, file_name=None):

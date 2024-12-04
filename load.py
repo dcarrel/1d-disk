@@ -70,13 +70,17 @@ class LoadSimulation:
         comparr = []
 
         def am_distribution(x, f):
-            mu = np.log(self.params.LC / f + self.params.LMIN)
-            sigma2 = 2 * np.log((self.params.LC + self.params.LMIN) / (self.params.LC / f + self.params.LMIN))
-            return 1 / (x - self.params.LMIN) / np.sqrt(sigma2 * 2 * np.pi) * np.exp(-(np.log(x - self.params.LMIN) - mu) ** 2 / 2 / sigma2)
+            mu = np.log(self.params.LC / f - self.params.LMIN)
+            sigma2 = 2 * np.log((self.params.LC - self.params.LMIN) / (self.params.LC / f - self.params.LMIN))
+            return 1 / (x - self.params.LMIN) / np.sqrt(sigma2 * 2 * np.pi) * np.exp(
+                -(np.log(x - self.params.LMIN) - mu) ** 2 / 2 / sigma2)
+
         def spec_ang(x):
-            return np.sqrt(CONST_G * self.params.MBH * x ** 2 / (x - self.params.RSCH))
+            return np.sqrt(CONST_G * self.params.MBH * x ** 3 / (x - self.params.RSCH) ** 2)
+
         def dl_dr(x):
-            return np.sqrt(CONST_G * self.params.MBH / (x - self.params.RSCH)) - 0.5 * x * np.sqrt(CONST_G * self.params.MBH / (x - self.params.RSCH) ** 3)
+            return spec_ang(x) * (1.5 / x - 1 / (x - self.params.RSCH))
+
         def mass_distribution(x, f):
             am_x = spec_ang(x)
             am_dist = am_distribution(am_x, f)
@@ -85,8 +89,9 @@ class LoadSimulation:
             result = np.where(result < 0, 0, result)
             return result
 
-        self.mass_distribution = mass_distribution(self.grid.r_cell, self.params.SIGMAF)
+        self.mass_distribution = mass_distribution(self.grid.r_cell, self.params.SIGMAF2U)
 
+        ## gets the median of the distribution
         if tindex is not None:
             comparr = np.array(self.ts)[tindex]
 
@@ -156,7 +161,7 @@ class LoadSimulation:
 
         self.eos = load_table(params.EOS_TABLE)
 
-        self.chi = self.sigma*self.grid.omgko*np.sqrt((self.grid.r_cell - self.params.RSCH)/self.grid.r_cell)
+        self.chi = self.sigma*self.grid.omgko
         self.T = self.eos(self.chi, self.s)
 
         self.rho = entropy_difference(self.T, self.chi, self.s, just_density=True)
