@@ -1,5 +1,6 @@
 import numpy as np
 from consts import *
+from scipy.integrate import trapz
 import json, os, sys
 sys.path.append(os.path.abspath(os.getcwd()))
 from STARS_library.SL_run import *
@@ -183,7 +184,7 @@ class Params:
 
         self.TFB = 0.11*YEAR*stellar_radius(self.MSTAR/MSUN)**(3/2)*(self.MBH/1e6/MSUN)**(1/6)*(self.MSTAR/MSUN)**-1
         self.RT = 100*RSUN*stellar_radius(self.MSTAR/MSUN)*(MSUN/self.MSTAR)**(1/3)*(self.MBH/1e6/MSUN)**(1/3)
-        self.RP = self.RT/BETA
+        self.RP = self.RT/self.BETA
         try:
             self.MDOT = STARS_library().retrieve(self.MSTAR/MSUN, self.MAGE, self.BETA, self.MBH)
             self.FALLBACK_FAILURE=False
@@ -231,14 +232,14 @@ class Params:
             result = np.where(result < 0, 0, result)
             return result
 
-        def sigmaf_func(f, rmed):
+        def sigmaf_func(f, ravg0):
             fake_grid = np.logspace(np.log10(self.R0), np.log10(self.RF), 1000)
             sigma_dist = mass_distribution(fake_grid, f)
             mass_dist = 2 * np.pi * fake_grid * sigma_dist
-            peak_loc = fake_grid[np.argmax(mass_dist)]
-            return peak_loc - rmed
+            ravg = trapz(mass_dist*fake_grid, fake_grid)
+            return ravg - ravg0
 
-        sigmaf_sol = fsolve(sigmaf_func, 1.005, args=(self.SIGMAF*self.RC), xtol=1e-3, epsfcn=1e-6,
+        sigmaf_sol = fsolve(sigmaf_func, 1.0005, args=(self.SIGMAF*self.RC), xtol=1e-4, epsfcn=1e-4,
                             full_output=True)
         if sigmaf_sol[2] == 1:
             self.SIGMAF2U = sigmaf_sol[0][0]
@@ -251,7 +252,8 @@ class Params:
         if not os.path.exists(self.SIM_DIR):
             os.makedirs(self.SIM_DIR)
         if file_name is None: file_name = "params.json"
-        with open(os.path.join(self.SIM_DIR, file_name), "w") as f:
+        file_dir = os.path.join(self.SIM_DIR, file_name)
+        with open(file_dir, "w") as f:
             json.dump(self._pdict, f)
 
 

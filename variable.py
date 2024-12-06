@@ -50,6 +50,18 @@ class FullVariable:
         cutoff = 1#np.maximum(1, np.exp(-(self.grid.r_cell/5/self.params.RC)**2))
         self.mass_distribution *= cutoff
 
+        def smooth_correction(A, B, C, D):
+            numerator = A# + B*np.exp(-(self.grid.r_cell - C)**2/D)
+            denominator = 1 + np.exp((self.grid.r_cell - C)/D)
+            return numerator / denominator
+
+        A = 1e-2*np.max(self.mass_distribution)
+        B = 10*A
+        C = self.grid.r_cell[np.argmax(self.mass_distribution)]
+        D = self.grid.r_cell[::-1][np.argmax(np.where(self.mass_distribution > 0.5*np.max(self.mass_distribution),1,0)[::-1])]
+
+        self.modified_mass_distribution = self.mass_distribution + smooth_correction(A, B, C, D)
+
     def update_variables(self, sigma, ts, t=0):
         self.sigma = sigma
         below_floor = self.sigma < self.params.SIGMA_FLOOR
