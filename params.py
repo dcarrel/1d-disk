@@ -244,7 +244,9 @@ class Params:
             ravg = trapz(mass_dist*fake_grid, fake_grid)
             return ravg - ravg0
 
-        sigmaf_sol = fsolve(sigmaf_func, 1.005, args=(self.SIGMAF), xtol=1e-4, epsfcn=1e-4,
+        sigmaf_sol = [0,0,0]
+        if not self.FALLBACK_FAILURE:
+            sigmaf_sol = fsolve(sigmaf_func, 1.005, args=(self.SIGMAF), xtol=1e-4, epsfcn=1e-4,
                             full_output=True)
         if sigmaf_sol[2] == 1:
             self.SIGMAF2U = sigmaf_sol[0][0]
