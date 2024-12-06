@@ -154,7 +154,7 @@ class FullVariable:
         ## uses angular momentum distribution instead
 
 
-        sigma_fb = self.mass_distribution * self.params.MDOT(self.t)
+        sigma_fb = self.modified_mass_distribution * self.params.MDOT(self.t)
         if not self.params.FB_ON: sigma_fb *= 0
         self.sigma_dot = sigma_fb - sigma_wl
 
