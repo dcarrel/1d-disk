@@ -55,12 +55,15 @@ class FullVariable:
             denominator = 1 + np.exp((self.grid.r_cell - C)/D)
             return numerator / denominator
 
-        A = 1e-2*np.max(self.mass_distribution)
+        A = 1e-3*np.max(self.mass_distribution)
         B = 10*A
         C = self.grid.r_cell[np.argmax(self.mass_distribution)]
         D = self.grid.r_cell[::-1][np.argmax(np.where(self.mass_distribution > 0.5*np.max(self.mass_distribution),1,0)[::-1])]
 
-        self.modified_mass_distribution = self.mass_distribution + smooth_correction(A, B, C, D)
+        #self.modified_mass_distribution = self.mass_distribution + smooth_correction(A, B, C, D)
+        md_max = np.max(self.mass_distribution)
+        rd_max = self.grid.r_cell[np.argmax(self.mass_distribution)]
+        self.modified_mass_distribution = np.where(self.grid.r_cell < rd_max, md_max, self.mass_distribution)
 
     def update_variables(self, sigma, ts, t=0):
         self.sigma = sigma

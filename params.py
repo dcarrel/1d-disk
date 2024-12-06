@@ -232,14 +232,19 @@ class Params:
             result = np.where(result < 0, 0, result)
             return result
 
-        def sigmaf_func(f, ravg0):
+        def sigmaf_func(f, sigg):
             fake_grid = np.logspace(np.log10(self.R0), np.log10(self.RF), 1000)
             sigma_dist = mass_distribution(fake_grid, f)
+
+            total_sigma_dist = sigma_dist*self.TOTAL_FALLBACK_MASS
+            total_sigma_at_a = np.interp(self.A_ORB, fake_grid, total_sigma_dist)
+            return np.log10(sigg/total_sigma_at_a)
+
             mass_dist = 2 * np.pi * fake_grid * sigma_dist
             ravg = trapz(mass_dist*fake_grid, fake_grid)
             return ravg - ravg0
 
-        sigmaf_sol = fsolve(sigmaf_func, 1.0005, args=(self.SIGMAF*self.RC), xtol=1e-4, epsfcn=1e-4,
+        sigmaf_sol = fsolve(sigmaf_func, 1.005, args=(self.SIGMAF), xtol=1e-4, epsfcn=1e-4,
                             full_output=True)
         if sigmaf_sol[2] == 1:
             self.SIGMAF2U = sigmaf_sol[0][0]
